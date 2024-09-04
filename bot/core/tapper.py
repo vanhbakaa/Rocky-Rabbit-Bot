@@ -72,6 +72,7 @@ class Tapper:
         self.ref = 0
         self.user_level = 0
         self.new_account = False
+        self.recover = 1
 
     def get_user_level(self, auth_token):
         try:
@@ -260,6 +261,7 @@ class Tapper:
             if response.status_code == 200:
                 response_data = response.json()
                 self.available_taps = response_data['clicker']['availableTaps']
+                self.recover = response_data['clicker']['tapsRecoverPerSec']
                 self.max_tap = response_data['clicker']['maxTaps']
                 self.multi = response_data['clicker']['earnPerTap']
                 logger.info(
@@ -756,6 +758,7 @@ class Tapper:
                                 sleep_ = randint(settings.DELAY_BETWEEN_TAPS[0]+120, settings.DELAY_BETWEEN_TAPS[1]+120)
                                 logger.info(f"{self.session_name} | Out of energy... -  wait {sleep_} seconds")
                                 await asyncio.sleep(sleep_)
+                                self.available_taps += self.recover*sleep_
                         except:
                             logger.error(f"{self.session_name} | Check your TAP_COUNT setting...")
                         i -= 1
