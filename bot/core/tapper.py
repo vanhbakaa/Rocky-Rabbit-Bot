@@ -559,13 +559,13 @@ class Tapper:
     def check_condition(self, card):
         # print(card['condition'])
         # print(self.mineCards[card['upgradeId']])
-        if self.balance < self.mineCards[card['upgradeId']]['price']:
+        if self.mineCards[card['upgradeId']]['isCompleted']:
+            # logger.info(f"cant upgrade {card['upgradeId']} | reached max level")
+            return False
+        elif self.balance < self.mineCards[card['upgradeId']]['price']:
             # logger.info(f"cant upgrade {card['upgradeId']} because of low balance")
             return False
         elif self.mineCards[card['upgradeId']]['type'] == "daily" and self.mineCards[card['upgradeId']]['lastUpgradeAt'] != 0:
-            return False
-        elif self.mineCards[card['upgradeId']]['level'] > self.user_level:
-            # logger.info(f"cant upgrade {card['upgradeId']} because card level larger than user level")
             return False
         elif len(card['condition']) == 0:
             return True
@@ -578,25 +578,32 @@ class Tapper:
                     if start_time <= curr_time <= end_time:
                         pass
                     else:
-                        #logger.info(f"cant upgrade {card['upgradeId']} because time condition")
+                        # logger.info(f"cant upgrade {card['upgradeId']} because time condition")
                         return False
                 elif condition['type'] == "by-upgrade-user" or condition['type'] == "by-upgrade":
                     if (self.mineCards[condition['levelUpID']]['level'] - 1) >= (condition['level'] + 1):
                         pass
                     else:
-                        #logger.info(f"cant upgrade {card['upgradeId']} because card conditiono not met")
+                        # logger.info(f"cant upgrade {card['upgradeId']} because card conditiono not met")
                         return False
 
                 elif condition['type'] == "invite-friend":
                     if self.ref >= condition['level']:
                         pass
                     else:
-                        #logger.info(f"cant upgrade {card['upgradeId']} because ref")
+                        # logger.info(f"cant upgrade {card['upgradeId']} because ref")
+                        return False
+                elif condition['type'] == 'level-user':
+                    if self.mineCards[card['upgradeId']]['level'] > self.user_level:
                         return False
                 elif condition['type'] == 'by-level':
-                    if self.user_level < condition['level']:
-                        #logger.info(f"cant upgrade {card['upgradeId']} because user level too low")
+                    card_name = 'league_'+str(condition['level']-1)
+                    # print(card_name)
+                    if self.mineCards[card_name]['level'] <= 10:
+                        # logger.info(f"cant upgrade {card['upgradeId']} because user level too low")
                         return False
+                    else:
+                        return True
             return True
 
     def upgrade_card(self, auth_token, cardId, cost):
