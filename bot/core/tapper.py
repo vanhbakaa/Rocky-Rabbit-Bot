@@ -753,7 +753,7 @@ class Tapper:
                                             self.boost_energy(self.auth_token)
                                         else:
                                             logger.info(f"{self.session_name} | Cant use boost at this time...")
-                                sleep_ = randint(settings.DELAY_BETWEEN_TAPS[0]+60, settings.DELAY_BETWEEN_TAPS[1]+60)
+                                sleep_ = randint(settings.DELAY_BETWEEN_TAPS[0]+120, settings.DELAY_BETWEEN_TAPS[1]+120)
                                 logger.info(f"{self.session_name} | Out of energy... -  wait {sleep_} seconds")
                                 await asyncio.sleep(sleep_)
                         except:
