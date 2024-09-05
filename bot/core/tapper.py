@@ -73,6 +73,12 @@ class Tapper:
         self.user_level = 0
         self.new_account = False
         self.recover = 1
+        self.get_from_cache = False
+
+    def write_to_file(self, data):
+        f = open("enigma.txt", "w")
+        f.write(data)
+        f.close()
 
     def get_user_level(self, auth_token):
         try:
@@ -433,7 +439,18 @@ class Tapper:
         response = requests.get("https://freddywhest.github.io/rocky-rabbit-combos/data.json")
         if response.status_code == 200:
             response_data = response.json()
-            self.enigma = response_data['enigma']
+            with open("enigma.txt", "r") as f:
+                enigma_from_cache = f.read()
+                #print(enigma_from_cache)
+
+            response_enigma = ",".join(response_data['enigma'])
+            if enigma_from_cache != response_enigma:
+                self.enigma = response_enigma
+                self.get_from_cache = False
+                self.write_to_file(response_enigma)
+            else:
+                self.get_from_cache = True
+                self.enigma = enigma_from_cache
             self.easter = response_data['easter']
             self.superset = response_data['cards']
             self.easter_expire = response_data['expireAtForEaster']
@@ -461,12 +478,11 @@ class Tapper:
 
     def play_enigma(self, auth_token, enigmaId, passphase):
         try:
-            codei = ",".join(passphase)
+
             payload = {
                 "enigmaId": enigmaId,
-                "passphrase": codei
+                "passphrase": passphase
             }
-
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
             response = requests.post(api_play_enigma, headers=headers, json=payload)
@@ -475,6 +491,7 @@ class Tapper:
                 self.balance = response_data['clicker']['balance']
                 logger.success(f"{self.session_name} | <green>Successfully claimed enigma</green> | Balance: <yellow>{response_data['clicker']['balance']}</yellow> | Total balance: <yellow>{response_data['clicker']['totalBalance']}</yellow>")
             else:
+                print(response.json())
                 logger.info(f"{self.session_name} | Failed to claim enigma - Response code: {response.status_code}")
         except Exception as e:
             traceback.print_exc()
@@ -599,6 +616,8 @@ class Tapper:
                 elif condition['type'] == 'by-level':
                     card_name = 'league_'+str(condition['level']-1)
                     # print(card_name)
+                    if card_name == 'league_0':
+                        return True
                     if self.mineCards[card_name]['level'] <= 10:
                         # logger.info(f"cant upgrade {card['upgradeId']} because user level too low")
                         return False
@@ -696,7 +715,12 @@ class Tapper:
                     self.get_daily_data(self.auth_token)
                     self.get_daily_combo()
 
-                    if self.daily_data['enigma']['completedAt'] == 0:
+                    if  int(self.daily_data['enigma']['countTry']) >= 3:
+                        logger.info(f"{self.session_name} | Out of chances to play today, skipping...")
+
+                    elif self.daily_data['enigma']['completedAt'] == 0 and int(self.daily_data['enigma']['countTry']) > 0 and self.get_from_cache:
+                        logger.info(f"{self.session_name} | Wait to find enigma...")
+                    elif self.daily_data['enigma']['completedAt'] == 0:
                         logger.info(f"{self.session_name} | Attempt to play enigma...")
                         self.play_enigma(self.auth_token, self.daily_data['enigma']['enigmaId'], self.enigma)
                     else:
@@ -725,6 +749,7 @@ class Tapper:
                     if self.daily_data['easterEggs']['completedAt'] == 0:
                         time_to_compare = datetime.strptime(self.easter_expire, "%Y-%m-%dT%H:%M:%S.%fZ")
                         current_time = datetime.utcnow()
+                        # print(current_time)
                         logger.info(f"{self.session_name} | Attempt to play easter egg...")
                         if current_time < time_to_compare:
                             self.play_easter(self.auth_token, self.easter, self.daily_data['easterEggs']['easterEggsId'])
