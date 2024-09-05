@@ -10,8 +10,8 @@ from aiohttp_proxy import ProxyConnector
 from better_proxy import Proxy
 from pyrogram import Client
 from pyrogram.errors import Unauthorized, UserDeactivated, AuthKeyUnregistered, FloodWait
-from pyrogram.raw.types import InputBotAppShortName
-from pyrogram.raw.functions.messages import RequestAppWebView
+from pyrogram.raw import functions
+from pyrogram.raw.functions.messages import RequestWebView
 from bot.core.agents import generate_random_user_agent
 from bot.config import settings
 import requests
@@ -73,6 +73,12 @@ class Tapper:
         self.user_level = 0
         self.new_account = False
         self.recover = 1
+        self.get_from_cache = False
+
+    def write_to_file(self, data):
+        f = open("enigma.txt", "w")
+        f.write(data)
+        f.close()
 
     def get_user_level(self, auth_token):
         try:
@@ -148,7 +154,15 @@ class Tapper:
                             break
                     if not start_command_found:
                         self.new_account = True
-
+                        peer = await self.tg_client.resolve_peer('rocky_rabbit_bot')
+                        await self.tg_client.invoke(
+                            functions.messages.StartBot(
+                                bot=peer,
+                                peer=peer,
+                                start_param=start_param,
+                                random_id=randint(1, 9999999)
+                            )
+                        )
                 except (Unauthorized, UserDeactivated, AuthKeyUnregistered):
                     raise InvalidSession(self.session_name)
 
@@ -164,22 +178,29 @@ class Tapper:
 
                     await asyncio.sleep(fls + 3)
 
-            web_view = await self.tg_client.invoke(RequestAppWebView(
+            web_view = await self.tg_client.invoke(RequestWebView(
                 peer=peer,
-                app=InputBotAppShortName(bot_id=peer, short_name="play"),
+                bot=peer,
                 platform='android',
-                write_allowed=True,
-                start_param=start_param
+                from_bot_menu=False,
+                url="https://play.rockyrabbit.io/",
             ))
 
             auth_url = web_view.url
             # print(auth_url)
-            tg_web_data = unquote(string=auth_url.split('tgWebAppData=')[1].split('&tgWebAppVersion')[0])
+            tg_web_data = unquote(
+                string=unquote(string=auth_url.split('tgWebAppData=')[1].split('&tgWebAppVersion')[0]))
+            query_id = tg_web_data.split('query_id=')[1].split('&user=')[0]
+            user = quote(tg_web_data.split("&user=")[1].split('&auth_date=')[0])
+            auth_date = tg_web_data.split('&auth_date=')[1].split('&hash=')[0]
+            hash_ = tg_web_data.split('&hash=')[1]
 
+            self.user_id = tg_web_data.split('"id":')[1].split(',"first_name"')[0]
+            self.first_name = tg_web_data.split('"first_name":"')[1].split('","last_name"')[0]
+            self.last_name = tg_web_data.split('"last_name":"')[1].split('","username"')[0]
             if self.tg_client.is_connected:
                 await self.tg_client.disconnect()
-
-            return tg_web_data
+            return f"query_id={query_id}&user={user}&auth_date={auth_date}&hash={hash_}"
 
         except InvalidSession as error:
             raise error
@@ -418,7 +439,18 @@ class Tapper:
         response = requests.get("https://freddywhest.github.io/rocky-rabbit-combos/data.json")
         if response.status_code == 200:
             response_data = response.json()
-            self.enigma = response_data['enigma']
+            with open("enigma.txt", "r") as f:
+                enigma_from_cache = f.read()
+                #print(enigma_from_cache)
+
+            response_enigma = ",".join(response_data['enigma'])
+            if enigma_from_cache != response_enigma:
+                self.enigma = response_enigma
+                self.get_from_cache = False
+                self.write_to_file(response_enigma)
+            else:
+                self.get_from_cache = True
+                self.enigma = enigma_from_cache
             self.easter = response_data['easter']
             self.superset = response_data['cards']
             self.easter_expire = response_data['expireAtForEaster']
@@ -446,12 +478,11 @@ class Tapper:
 
     def play_enigma(self, auth_token, enigmaId, passphase):
         try:
-            codei = ",".join(passphase)
+
             payload = {
                 "enigmaId": enigmaId,
-                "passphrase": codei
+                "passphrase": passphase
             }
-
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
             response = requests.post(api_play_enigma, headers=headers, json=payload)
@@ -460,6 +491,7 @@ class Tapper:
                 self.balance = response_data['clicker']['balance']
                 logger.success(f"{self.session_name} | <green>Successfully claimed enigma</green> | Balance: <yellow>{response_data['clicker']['balance']}</yellow> | Total balance: <yellow>{response_data['clicker']['totalBalance']}</yellow>")
             else:
+                print(response.json())
                 logger.info(f"{self.session_name} | Failed to claim enigma - Response code: {response.status_code}")
         except Exception as e:
             traceback.print_exc()
@@ -542,21 +574,16 @@ class Tapper:
             logger.error(f"{self.session_name} | <red>Unknown error while trying to get user's cards info - Error: {e}</red>")
 
     def check_condition(self, card):
-        # print(card['upgradeId'])
+        # print(card['condition'])
         # print(self.mineCards[card['upgradeId']])
         if self.mineCards[card['upgradeId']]['isCompleted']:
             # logger.info(f"cant upgrade {card['upgradeId']} | reached max level")
             return False
-        elif self.balance < self.mineCards[card['upgradeId']]['price'] and card['tab'] != 'Claim':
+        elif self.balance < self.mineCards[card['upgradeId']]['price']:
             # logger.info(f"cant upgrade {card['upgradeId']} because of low balance")
             return False
         elif self.mineCards[card['upgradeId']]['type'] == "daily" and self.mineCards[card['upgradeId']]['lastUpgradeAt'] != 0:
-            timestamp_datetime = datetime.fromtimestamp(self.mineCards[card['upgradeId']]['lastUpgradeAt'])
-            now = datetime.now()
-            start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            if start_of_today < timestamp_datetime:
-                # logger.info(f"cant upgrade {card['upgradeId']} already claimed today")
-                return False
+            return False
         elif len(card['condition']) == 0:
             return True
         else:
@@ -566,14 +593,12 @@ class Tapper:
                     end_time = datetime.strptime(f"{condition['endHour']}:00:00", "%H:%M:%S").time()
                     curr_time = datetime.now().time()
                     if start_time <= curr_time <= end_time:
-                        # print("time condition: ok")
                         pass
                     else:
                         # logger.info(f"cant upgrade {card['upgradeId']} because time condition")
                         return False
                 elif condition['type'] == "by-upgrade-user" or condition['type'] == "by-upgrade":
                     if (self.mineCards[condition['levelUpID']]['level'] - 1) >= (condition['level'] + 1):
-                        # print("card condition: ok")
                         pass
                     else:
                         # logger.info(f"cant upgrade {card['upgradeId']} because card conditiono not met")
@@ -587,18 +612,18 @@ class Tapper:
                         return False
                 elif condition['type'] == 'level-user':
                     if self.mineCards[card['upgradeId']]['level'] > self.user_level:
-                        # logger.info(f"cant upgrade {card['upgradeId']} because card lvl larger than user level")
                         return False
                 elif condition['type'] == 'by-level':
                     card_name = 'league_'+str(condition['level']-1)
                     # print(card_name)
+                    if card_name == 'league_0':
+                        return True
                     if self.mineCards[card_name]['level'] <= 10:
                         # logger.info(f"cant upgrade {card['upgradeId']} because user level too low")
                         return False
                     else:
                         return True
-
-        return True
+            return True
 
     def upgrade_card(self, auth_token, cardId, cost):
         try:
@@ -690,7 +715,12 @@ class Tapper:
                     self.get_daily_data(self.auth_token)
                     self.get_daily_combo()
 
-                    if self.daily_data['enigma']['completedAt'] == 0:
+                    if  int(self.daily_data['enigma']['countTry']) >= 3:
+                        logger.info(f"{self.session_name} | Out of chances to play today, skipping...")
+
+                    elif self.daily_data['enigma']['completedAt'] == 0 and int(self.daily_data['enigma']['countTry']) > 0 and self.get_from_cache:
+                        logger.info(f"{self.session_name} | Wait to find enigma...")
+                    elif self.daily_data['enigma']['completedAt'] == 0:
                         logger.info(f"{self.session_name} | Attempt to play enigma...")
                         self.play_enigma(self.auth_token, self.daily_data['enigma']['enigmaId'], self.enigma)
                     else:
@@ -719,6 +749,7 @@ class Tapper:
                     if self.daily_data['easterEggs']['completedAt'] == 0:
                         time_to_compare = datetime.strptime(self.easter_expire, "%Y-%m-%dT%H:%M:%S.%fZ")
                         current_time = datetime.utcnow()
+                        # print(current_time)
                         logger.info(f"{self.session_name} | Attempt to play easter egg...")
                         if current_time < time_to_compare:
                             self.play_easter(self.auth_token, self.easter, self.daily_data['easterEggs']['easterEggsId'])
@@ -808,9 +839,6 @@ class Tapper:
 
 async def run_tapper(tg_client: Client, proxy: str | None):
     try:
-        sleep_ = randint(1, 15)
-        logger.info(f"{tg_client.name} | start after {sleep_}")
-        await asyncio.sleep(sleep_)
         await Tapper(tg_client=tg_client).run(proxy=proxy)
     except InvalidSession:
         logger.error(f"{tg_client.name} | Invalid Session")
