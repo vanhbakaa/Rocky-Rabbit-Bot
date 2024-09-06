@@ -614,7 +614,7 @@ class Tapper:
                         return True
         return True
 
-    def upgrade_card(self, auth_token, cardId, cost):
+    def upgrade_card(self, auth_token, cardId, cost, type):
         try:
             payload = {
                 "upgradeId": cardId,
@@ -634,10 +634,12 @@ class Tapper:
 
                 self.balance = response_data['clicker']['balance']
             else:
-                if response.status_code == 422:
+                if type == "Claim":
+                    logger.info(f"{self.session_name} | Failed to Claim {cardId} - Not time to claim yet")
+                elif response.status_code == 422:
                     response_data = response.json()
                     print(response_data)
-                logger.info(f"{self.session_name} | Failed to upgrade {cardId} - Response code: {response.status_code}")
+                    logger.info(f"{self.session_name} | Failed to upgrade {cardId} - Response code: {response.status_code}")
         except Exception as e:
             traceback.print_exc()
             logger.error(
@@ -794,7 +796,7 @@ class Tapper:
                         #print(card)
                         if self.check_condition(card):
                             logger.info(f"{self.session_name} | Attemp to upgrade {card['upgradeId']}...")
-                            self.upgrade_card(self.auth_token, card['upgradeId'], self.mineCards[card['upgradeId']]['price'])
+                            self.upgrade_card(self.auth_token, card['upgradeId'], self.mineCards[card['upgradeId']]['price'], card['tab'])
                             await asyncio.sleep(randint(2,4))
 
                 if settings.AUTO_UPGRADE_BOOST:
