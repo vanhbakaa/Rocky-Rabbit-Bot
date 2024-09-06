@@ -282,7 +282,7 @@ class Tapper:
             response = requests.post(api_boost, headers=headers, json=payload)
             if response.status_code == 200:
                 response_data = response.json()
-                self.available_taps = response_data['clicker']['availableTaps']
+                self.available_taps = response_data['clicker']['maxTaps']
                 self.boost_energy_lvl = response_data['boost']['level']
                 self.cool_down = response_data['boost']['lastUpgradeAt']
                 logger.info(
@@ -773,7 +773,7 @@ class Tapper:
                         self.get_boost_info(self.auth_token)
                     while i > 0:
                         try:
-
+                            tapCount = randint(settings.TAP_COUNT[0], settings.TAP_COUNT[1])
                             if self.available_taps > tapCount * self.multi:
                                 if settings.AUTO_BOOST:
                                     # print(self.boost_turbo_lvl)
@@ -781,12 +781,13 @@ class Tapper:
                                         if self.boost_turbo(self.auth_token):
                                             logger.info(f"{self.session_name} | turbo boosted tap faster...")
                                             tapCount = randint(settings.TAP_COUNT[0], settings.TAP_COUNT[1])
-                                            self.auto_tap(self.auth_token, tapCount)
-                                            await asyncio.sleep(randint(3, 5))
+                                            if self.available_taps > tapCount * self.multi:
+                                                self.auto_tap(self.auth_token, tapCount)
+                                                await asyncio.sleep(randint(3, 5))
                                             tapCount = randint(settings.TAP_COUNT[0], settings.TAP_COUNT[1])
-                                            self.auto_tap(self.auth_token, tapCount)
-                                            await asyncio.sleep(randint(3, 5))
-                                tapCount = randint(settings.TAP_COUNT[0], settings.TAP_COUNT[1])
+                                            if self.available_taps > tapCount * self.multi:
+                                                self.auto_tap(self.auth_token, tapCount)
+                                                await asyncio.sleep(randint(3, 5))
                                 self.auto_tap(self.auth_token, tapCount)
                                 sleep_ = randint(settings.DELAY_BETWEEN_TAPS[0], settings.DELAY_BETWEEN_TAPS[1])
                                 await asyncio.sleep(sleep_)
