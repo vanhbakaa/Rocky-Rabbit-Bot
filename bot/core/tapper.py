@@ -74,6 +74,10 @@ class Tapper:
         self.new_account = False
         self.recover = 1
         self.get_from_cache = False
+        self.limit_time_cards = ['breakfast_fighter', 'snackbreak_fighter', 'lunch_fighter', 'lunchbreak_fighter',
+                                 'dinner_fighter', 'morning_fighter', 'afternoon_fighter', 'beforebed_fighter']
+
+        self.caculate_profiable_card = {}
 
     def write_to_file(self, data):
         f = open("enigma.txt", "w")
@@ -93,6 +97,7 @@ class Tapper:
         except Exception as e:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to get level info ...: {e}</red>")
+
     def get_ref(self, auth_token):
         try:
             headers['Authorization'] = f'tma {auth_token}'
@@ -106,6 +111,7 @@ class Tapper:
         except Exception as e:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to get referrals info ...: {e}</red>")
+
     def get_user_data(self, auth_token):
         try:
             headers['Authorization'] = f'tma {auth_token}'
@@ -194,7 +200,6 @@ class Tapper:
                          f"{error}")
             await asyncio.sleep(delay=3)
 
-
     async def check_proxy(self, http_client: aiohttp.ClientSession, proxy: Proxy) -> None:
         try:
             response = await http_client.get(url='https://httpbin.org/ip', timeout=aiohttp.ClientTimeout(5))
@@ -220,6 +225,7 @@ class Tapper:
         except Exception as e:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to set up ...: {e}</red>")
+
     async def join_channel(self):
         try:
             logger.info(f"{self.session_name} | Joining TG channel...")
@@ -289,7 +295,6 @@ class Tapper:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to boost ...: {e}</red>")
 
-
     def boost_turbo(self, auth_token):
         try:
             payload = {
@@ -315,7 +320,6 @@ class Tapper:
             logger.error(f"{self.session_name} | <red>Unknown error while trying to boost ...: {e}</red>")
             return False
 
-
     def get_boost_info(self, auth_token):
         try:
             headers['Authorization'] = f'tma {auth_token}'
@@ -323,16 +327,19 @@ class Tapper:
             response = requests.post(api_boost_info, headers=headers)
             if response.status_code == 200:
                 response_data = response.json()
-                self.boost_turbo_lvl = response_data['boostsList'][4]['level']
-                self.boost_energy_lvl = response_data['boostsList'][1]['level']
-                self.cool_down = response_data['boostsList'][1]['lastUpgradeAt']
+                for boost in response_data['boostsList']:
+                    if boost['boostId'] == "turbo":
+                        self.boost_turbo_lvl = boost['level']
+                        self.cool_down_turbo = boost['lastUpgradeAt']
+                    elif boost['boostId'] == "full-available-taps":
+                        self.boost_energy_lvl = boost['level']
+                        self.cool_down = boost['lastUpgradeAt']
                 self.boosts = response_data['boostsList']
             else:
                 logger.info(f"{self.session_name} | Get boost info failed... Response code: {response.status_code}")
         except Exception as e:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to get boost info ...: {e}</red>")
-
 
     def upgrade_boost(self, auth_token, boostId):
         try:
@@ -360,7 +367,6 @@ class Tapper:
         except Exception as e:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to upgrade {txt} ...: {e}</red>")
-
 
     def get_task_list(self, auth_token):
         try:
@@ -396,11 +402,12 @@ class Tapper:
                     response_data = response.json()
                     if response_data['message'] == "you_are_not_subscribe_to_channel":
                         await self.join_channel()
-                logger.info(f"{self.session_name} | failed to do task: {taskId} - Response code: {response.status_code}")
+                logger.info(
+                    f"{self.session_name} | failed to do task: {taskId} - Response code: {response.status_code}")
         except Exception as e:
             traceback.print_exc()
-            logger.error(f"{self.session_name} | <red>Unknown error while trying to do task: {taskId} - Error: {e}</red>")
-
+            logger.error(
+                f"{self.session_name} | <red>Unknown error while trying to do task: {taskId} - Error: {e}</red>")
 
     def choose_sponsor(self, auth_token):
         try:
@@ -425,7 +432,7 @@ class Tapper:
             response_data = response.json()
             with open("enigma.txt", "r") as f:
                 enigma_from_cache = f.read()
-                #print(enigma_from_cache)
+                # print(enigma_from_cache)
 
             response_enigma = ",".join(response_data['enigma'])
             if enigma_from_cache != response_enigma:
@@ -441,7 +448,6 @@ class Tapper:
             self.superset_expire = response_data['expireAtForCards']
         else:
             logger.info(f"{self.session_name} | Get combo data failed.. Response code: {response.status_code}")
-
 
     def get_daily_data(self, auth_token):
         try:
@@ -473,7 +479,8 @@ class Tapper:
             if response.status_code == 200:
                 response_data = response.json()
                 self.balance = response_data['clicker']['balance']
-                logger.success(f"{self.session_name} | <green>Successfully claimed enigma</green> | Balance: <yellow>{response_data['clicker']['balance']}</yellow> | Total balance: <yellow>{response_data['clicker']['totalBalance']}</yellow>")
+                logger.success(
+                    f"{self.session_name} | <green>Successfully claimed enigma</green> | Balance: <yellow>{response_data['clicker']['balance']}</yellow> | Total balance: <yellow>{response_data['clicker']['totalBalance']}</yellow>")
             else:
                 print(response.json())
                 logger.info(f"{self.session_name} | Failed to claim enigma - Response code: {response.status_code}")
@@ -495,7 +502,8 @@ class Tapper:
             if response.status_code == 200:
                 response_data = response.json()
                 self.balance = response_data['clicker']['balance']
-                logger.success(f"{self.session_name} | <green>Successfully claimed superset</green> | Balance: <yellow>{response_data['clicker']['balance']}</yellow> | Total balance: <yellow>{response_data['clicker']['totalBalance']}</yellow>")
+                logger.success(
+                    f"{self.session_name} | <green>Successfully claimed superset</green> | Balance: <yellow>{response_data['clicker']['balance']}</yellow> | Total balance: <yellow>{response_data['clicker']['totalBalance']}</yellow>")
             else:
                 logger.info(f"{self.session_name} | Failed to claim superset - Response code: {response.status_code}")
         except Exception as e:
@@ -515,7 +523,8 @@ class Tapper:
             if response.status_code == 200:
                 response_data = response.json()
                 self.balance = response_data['clicker']['balance']
-                logger.success(f"{self.session_name} | <green>Successfully claimed easter egg</green> | Balance: <yellow>{response_data['clicker']['balance']}</yellow> | Total balance: <yellow>{response_data['clicker']['totalBalance']}</yellow>")
+                logger.success(
+                    f"{self.session_name} | <green>Successfully claimed easter egg</green> | Balance: <yellow>{response_data['clicker']['balance']}</yellow> | Total balance: <yellow>{response_data['clicker']['totalBalance']}</yellow>")
             else:
                 if response.status_code == 422:
                     response_data = response.json()
@@ -523,7 +532,8 @@ class Tapper:
                 logger.info(f"{self.session_name} | Failed to claim easter egg - Response code: {response.status_code}")
         except Exception as e:
             traceback.print_exc()
-            logger.error(f"{self.session_name} | <red>Unknown error while trying to claim easter egg - Error: {e}</red>")
+            logger.error(
+                f"{self.session_name} | <red>Unknown error while trying to claim easter egg - Error: {e}</red>")
 
     def get_cards_info(self, auth_token):
         try:
@@ -532,7 +542,7 @@ class Tapper:
             response = requests.post(api_data, headers=headers)
             if response.status_code == 200:
                 response_data = response.json()
-                #print(response_data)
+                # print(response_data)
                 self.cardsInfo = response_data['config']['upgrade']
             else:
                 logger.info(f"{self.session_name} | Failed to get cards info - Response code: {response.status_code}")
@@ -552,10 +562,12 @@ class Tapper:
                         card['upgradeId']: card
                     })
             else:
-                logger.info(f"{self.session_name} | Failed to get user's cards info - Response code: {response.status_code}")
+                logger.info(
+                    f"{self.session_name} | Failed to get user's cards info - Response code: {response.status_code}")
         except Exception as e:
             traceback.print_exc()
-            logger.error(f"{self.session_name} | <red>Unknown error while trying to get user's cards info - Error: {e}</red>")
+            logger.error(
+                f"{self.session_name} | <red>Unknown error while trying to get user's cards info - Error: {e}</red>")
 
     def check_condition(self, card):
         # print(card['condition'])
@@ -566,12 +578,12 @@ class Tapper:
         elif self.balance < self.mineCards[card['upgradeId']]['price'] and card['tab'] != 'Claim':
             # logger.info(f"cant upgrade {card['upgradeId']} because of low balance")
             return False
-        elif self.mineCards[card['upgradeId']]['type'] == "daily" and self.mineCards[card['upgradeId']]['lastUpgradeAt'] != 0:
+        elif self.mineCards[card['upgradeId']]['type'] == "daily" and self.mineCards[card['upgradeId']][
+            'lastUpgradeAt'] != 0 and card['upgradeId'] not in self.limit_time_cards:
             timestamp_datetime = datetime.fromtimestamp(self.mineCards[card['upgradeId']]['lastUpgradeAt'])
             now = datetime.now()
-            start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            if start_of_today < timestamp_datetime:
-                # logger.info(f"cant upgrade {card['upgradeId']} already claimed today")
+            if (now - timestamp_datetime) < timedelta(days=1):
+                # logger.info(f"cant upgrade {card['upgradeId']} 24h ago")
                 return False
         elif len(card['condition']) == 0:
             return True
@@ -587,10 +599,10 @@ class Tapper:
                         # logger.info(f"cant upgrade {card['upgradeId']} because time condition")
                         return False
                 elif condition['type'] == "by-upgrade-user" or condition['type'] == "by-upgrade":
-                    if (self.mineCards[condition['levelUpID']]['level'] - 1) >= (condition['level'] + 1):
+                    if (self.mineCards[condition['levelUpID']]['level'] - 1) >= self.user_level:
                         pass
                     else:
-                        # logger.info(f"cant upgrade {card['upgradeId']} because card conditiono not met")
+                        # logger.info(f"cant upgrade {card['upgradeId']} because card condition not met")
                         return False
 
                 elif condition['type'] == "invite-friend":
@@ -603,7 +615,7 @@ class Tapper:
                     if self.mineCards[card['upgradeId']]['level'] > self.user_level:
                         return False
                 elif condition['type'] == 'by-level':
-                    card_name = 'league_'+str(condition['level']-1)
+                    card_name = 'league_' + str(condition['level'] - 1)
                     # print(card_name)
                     if card_name == 'league_0':
                         return True
@@ -639,11 +651,16 @@ class Tapper:
                 elif response.status_code == 422:
                     response_data = response.json()
                     print(response_data)
-                    logger.info(f"{self.session_name} | Failed to upgrade {cardId} - Response code: {response.status_code}")
+                    logger.info(
+                        f"{self.session_name} | Failed to upgrade {cardId} - Response code: {response.status_code}")
         except Exception as e:
             traceback.print_exc()
             logger.error(
                 f"{self.session_name} | <red>Unknown error while trying to upgrade {cardId} - Error: {e}</red>")
+
+    def last_update(self, time_stampe):
+        current_time = time()
+        return current_time - time_stampe
 
     async def run(self, proxy: str | None) -> None:
         access_token_created_time = 0
@@ -665,8 +682,6 @@ class Tapper:
                     # print(tg_web_data)
                     access_token_created_time = time()
                     token_live_time = randint(3500, 3600)
-
-
 
                 self.get_user_data(self.auth_token)
 
@@ -706,17 +721,18 @@ class Tapper:
                     self.get_daily_data(self.auth_token)
                     self.get_daily_combo()
 
-                    if  int(self.daily_data['enigma']['countTry']) >= 3:
+                    if int(self.daily_data['enigma']['countTry']) >= 3:
                         logger.info(f"{self.session_name} | Out of chances to play today, skipping...")
 
-                    elif self.daily_data['enigma']['completedAt'] == 0 and int(self.daily_data['enigma']['countTry']) > 0 and self.get_from_cache:
+                    elif self.daily_data['enigma']['completedAt'] == 0 and int(
+                            self.daily_data['enigma']['countTry']) > 0 and self.get_from_cache:
                         logger.info(f"{self.session_name} | Wait to find enigma...")
                     elif self.daily_data['enigma']['completedAt'] == 0:
                         logger.info(f"{self.session_name} | Attempt to play enigma...")
                         self.play_enigma(self.auth_token, self.daily_data['enigma']['enigmaId'], self.enigma)
                     else:
                         logger.info(f"{self.session_name} | Enigma already completed, skipping...")
-                    await asyncio.sleep(randint(3,5))
+                    await asyncio.sleep(randint(3, 5))
 
                 if settings.AUTO_SUPERSET:
                     self.get_daily_data(self.auth_token)
@@ -743,7 +759,8 @@ class Tapper:
                         # print(current_time)
                         logger.info(f"{self.session_name} | Attempt to play easter egg...")
                         if current_time < time_to_compare:
-                            self.play_easter(self.auth_token, self.easter, self.daily_data['easterEggs']['easterEggsId'])
+                            self.play_easter(self.auth_token, self.easter,
+                                             self.daily_data['easterEggs']['easterEggsId'])
                         else:
                             logger.info(f"{self.session_name} | Wait to find easter...")
                     else:
@@ -757,9 +774,10 @@ class Tapper:
                     while i > 0:
                         try:
                             tapCount = randint(settings.TAP_COUNT[0], settings.TAP_COUNT[1])
-                            if self.available_taps > tapCount*self.multi:
+                            if self.available_taps > tapCount * self.multi:
                                 if settings.AUTO_BOOST:
-                                    if self.boost_turbo_lvl <= 3:
+                                    # print(self.boost_turbo_lvl)
+                                    if self.boost_turbo_lvl <= 3 or self.last_update(self.cool_down_turbo) >= 43200:
                                         if self.boost_turbo(self.auth_token):
                                             logger.info(f"{self.session_name} | turbo boosted tap faster...")
                                             self.auto_tap(self.auth_token, tapCount)
@@ -772,16 +790,20 @@ class Tapper:
                                 await asyncio.sleep(sleep_)
                             else:
                                 if settings.AUTO_BOOST:
-                                    if self.boost_energy_lvl <= 5:
+                                    if self.boost_energy_lvl <= 8:
                                         current_time = time()
-                                        if abs(current_time - self.cool_down) > 3600:
+                                        # print(current_time - self.cool_down)
+                                        if current_time - self.cool_down >= 2750 or self.last_update(
+                                                self.cool_down) >= 43200:
                                             self.boost_energy(self.auth_token)
                                         else:
                                             logger.info(f"{self.session_name} | Cant use boost at this time...")
-                                sleep_ = randint(settings.DELAY_BETWEEN_TAPS[0]+120, settings.DELAY_BETWEEN_TAPS[1]+120)
-                                logger.info(f"{self.session_name} | Out of energy... -  wait {sleep_} seconds")
-                                await asyncio.sleep(sleep_)
-                                self.available_taps += self.recover*sleep_
+                                            sleep_ = randint(settings.DELAY_BETWEEN_TAPS[0] + 120,
+                                                             settings.DELAY_BETWEEN_TAPS[1] + 120)
+                                            logger.info(
+                                                f"{self.session_name} | Out of energy... -  wait {sleep_} seconds")
+                                            await asyncio.sleep(sleep_)
+                                            self.available_taps += self.recover * sleep_
                         except:
                             logger.error(f"{self.session_name} | Check your TAP_COUNT setting...")
                         i -= 1
@@ -790,14 +812,32 @@ class Tapper:
                     self.get_cards_info(self.auth_token)
                     self.get_user_cards(self.auth_token)
 
-                    #print(self.mineCards)
+                    # print(self.mineCards)
                     for card in self.cardsInfo:
                         # print(self.mineCards[card])
-                        #print(card)
-                        if self.check_condition(card):
-                            logger.info(f"{self.session_name} | Attemp to upgrade {card['upgradeId']}...")
-                            self.upgrade_card(self.auth_token, card['upgradeId'], self.mineCards[card['upgradeId']]['price'], card['tab'])
-                            await asyncio.sleep(randint(2,4))
+                        # print(card)
+                        if card['type'] == "level-up":
+                            profitable_cal = self.mineCards[card['upgradeId']]['price'] / \
+                                             self.mineCards[card['upgradeId']]['profitPerHour']
+                            self.caculate_profiable_card.update({
+                                profitable_cal: card
+                            })
+                        elif self.check_condition(card):
+                            self.upgrade_card(self.auth_token, card['upgradeId'],
+                                              self.mineCards[card['upgradeId']]['price'], card['tab'])
+
+                    if len(self.caculate_profiable_card) > 0:
+                        most_profitable_card = dict(sorted(self.caculate_profiable_card.items()))
+                        # print(most_profitable_card)
+                        for card in most_profitable_card:
+                            # print(f"{card} | {most_profitable_card[card]['upgradeId']}")
+                            if self.check_condition(most_profitable_card[card]):
+                                logger.info(f"{self.session_name} | Attemp to upgrade {most_profitable_card[card]['upgradeId']}")
+                                self.upgrade_card(self.auth_token, most_profitable_card[card]['upgradeId'], most_profitable_card[card]['price'], most_profitable_card[card]['tab'])
+                                await asyncio.sleep(randint(1,3))
+                        
+                        self.caculate_profiable_card.clear()
+
 
                 if settings.AUTO_UPGRADE_BOOST:
                     if self.boosts is None:
@@ -808,16 +848,17 @@ class Tapper:
                         elif boost['price'] > self.balance:
                             logger.info(f"{self.session_name} | Balance too low to buy {boost['boostId']}.")
                             continue
-                        elif boost['boostId'] == "earn-per-tap" and boost['level'] > settings.MULTI_TAP_LVL:
+                        elif boost['boostId'] == "earn-per-tap" and boost['level'] >= settings.MULTI_TAP_LVL:
                             continue
-                        elif boost['boostId'] == "max-taps" and boost['level'] > settings.MAX_ENERGY_LVL:
+                        elif boost['boostId'] == "max-taps" and boost['level'] >= settings.MAX_ENERGY_LVL:
                             continue
-                        elif boost['boostId'] == "hourly-income-limit" and boost['level'] > settings.PASSIVE_INCOME_LVL:
+                        elif boost['boostId'] == "hourly-income-limit" and boost[
+                            'level'] >= settings.PASSIVE_INCOME_LVL:
                             continue
                         else:
                             self.upgrade_boost(self.auth_token, boost['boostId'])
 
-                Sleep = randint(200,300)
+                Sleep = randint(200, 300)
                 logger.info(f"Sleep {Sleep} seconds...")
                 await asyncio.sleep(Sleep)
             except InvalidSession as error:
@@ -827,6 +868,7 @@ class Tapper:
                 traceback.print_exc()
                 logger.error(f"{self.session_name} | Unknown error: {error}")
                 await asyncio.sleep(delay=randint(60, 120))
+
 
 async def run_tapper(tg_client: Client, proxy: str | None):
     try:
