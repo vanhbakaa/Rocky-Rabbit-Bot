@@ -801,6 +801,8 @@ class Tapper:
                                                     await asyncio.sleep(randint(3, 5))
                                     self.auto_tap(self.auth_token, tapCount, session)
                                     sleep_ = randint(settings.DELAY_BETWEEN_TAPS[0], settings.DELAY_BETWEEN_TAPS[1])
+                                    logger.info(f"{self.session_name} | Sleep {sleep_}s")
+                                    self.available_taps += self.recover * sleep_
                                     await asyncio.sleep(sleep_)
                                 else:
                                     if settings.AUTO_BOOST:
@@ -818,6 +820,13 @@ class Tapper:
                                                     f"{self.session_name} | Out of energy... -  wait {sleep_} seconds")
                                                 await asyncio.sleep(sleep_)
                                                 self.available_taps += self.recover * sleep_
+                                    else:
+                                        sleep_ = randint(settings.DELAY_BETWEEN_TAPS[0] + 120,
+                                                         settings.DELAY_BETWEEN_TAPS[1] + 120)
+                                        logger.info(
+                                            f"{self.session_name} | Out of energy... -  wait {sleep_} seconds")
+                                        await asyncio.sleep(sleep_)
+                                        self.available_taps += self.recover * sleep_
                             except:
                                 logger.error(f"{self.session_name} | Check your TAP_COUNT setting...")
                             i -= 1
@@ -859,15 +868,15 @@ class Tapper:
                         for boost in self.boosts:
                             if boost['boostId'] in self.black_list:
                                 continue
-                            elif boost['price'] > self.balance:
-                                logger.info(f"{self.session_name} | Balance too low to buy {boost['boostId']}.")
-                                continue
                             elif boost['boostId'] == "earn-per-tap" and boost['level'] >= settings.MULTI_TAP_LVL:
                                 continue
                             elif boost['boostId'] == "max-taps" and boost['level'] >= settings.MAX_ENERGY_LVL:
                                 continue
                             elif boost['boostId'] == "hourly-income-limit" and boost[
                                 'level'] >= settings.PASSIVE_INCOME_LVL:
+                                continue
+                            elif boost['price'] > self.balance:
+                                logger.info(f"{self.session_name} | Balance too low to buy {boost['boostId']}.")
                                 continue
                             else:
                                 self.upgrade_boost(self.auth_token, boost['boostId'], session)
