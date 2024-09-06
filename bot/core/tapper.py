@@ -773,18 +773,20 @@ class Tapper:
                         self.get_boost_info(self.auth_token)
                     while i > 0:
                         try:
-                            tapCount = randint(settings.TAP_COUNT[0], settings.TAP_COUNT[1])
+
                             if self.available_taps > tapCount * self.multi:
                                 if settings.AUTO_BOOST:
                                     # print(self.boost_turbo_lvl)
                                     if self.boost_turbo_lvl <= 3 or self.last_update(self.cool_down_turbo) >= 43200:
                                         if self.boost_turbo(self.auth_token):
                                             logger.info(f"{self.session_name} | turbo boosted tap faster...")
+                                            tapCount = randint(settings.TAP_COUNT[0], settings.TAP_COUNT[1])
                                             self.auto_tap(self.auth_token, tapCount)
                                             await asyncio.sleep(randint(3, 5))
+                                            tapCount = randint(settings.TAP_COUNT[0], settings.TAP_COUNT[1])
                                             self.auto_tap(self.auth_token, tapCount)
                                             await asyncio.sleep(randint(3, 5))
-
+                                tapCount = randint(settings.TAP_COUNT[0], settings.TAP_COUNT[1])
                                 self.auto_tap(self.auth_token, tapCount)
                                 sleep_ = randint(settings.DELAY_BETWEEN_TAPS[0], settings.DELAY_BETWEEN_TAPS[1])
                                 await asyncio.sleep(sleep_)
@@ -835,7 +837,7 @@ class Tapper:
                                 logger.info(f"{self.session_name} | Attemp to upgrade {most_profitable_card[card]['upgradeId']}")
                                 self.upgrade_card(self.auth_token, most_profitable_card[card]['upgradeId'], most_profitable_card[card]['price'], most_profitable_card[card]['tab'])
                                 await asyncio.sleep(randint(1,3))
-                        
+
                         self.caculate_profiable_card.clear()
 
 
