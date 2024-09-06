@@ -2,7 +2,7 @@ import asyncio
 import traceback
 from time import time
 from datetime import datetime, timedelta
-from urllib.parse import unquote, quote
+from urllib.parse import unquote
 
 import aiohttp
 from aiocfscrape import CloudflareScraper
@@ -19,8 +19,7 @@ import requests
 from bot.utils import logger
 from bot.exceptions import InvalidSession
 from .headers import headers
-from random import randint, uniform
-import uuid
+from random import randint
 
 api_auth = "https://api.rockyrabbit.io/api/v1/account/start"
 api_tap = "https://api.rockyrabbit.io/api/v1/clicker/tap"
@@ -74,6 +73,7 @@ class Tapper:
         self.new_account = False
         self.recover = 1
         self.get_from_cache = False
+        self.logged_in = False
         self.limit_time_cards = ['breakfast_fighter', 'snackbreak_fighter', 'lunch_fighter', 'lunchbreak_fighter',
                                  'dinner_fighter', 'morning_fighter', 'afternoon_fighter', 'beforebed_fighter']
 
@@ -112,21 +112,22 @@ class Tapper:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to get referrals info ...: {e}</red>")
 
-    def get_user_data(self, auth_token):
+    def get_user_data(self, auth_token, session: requests.Session):
         try:
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
-            response = requests.post(api_auth, headers=headers)
+            response = session.post(api_auth, headers=headers)
             if response.status_code == 200:
                 response_data = response.json()
                 self.balance = response_data['clicker']['balance']
-
+                self.logged_in = True
                 logger.info(
                     f"{self.session_name} | <green>Logged in</green> - Balance: <yellow>{response_data['clicker']['balance']}</yellow> - Profit per hour: <yellow>{response_data['clicker']['earnPassivePerHour']}</yellow> - Total earned: <yellow>{response_data['clicker']['totalBalance']}</yellow>")
 
             else:
-                print(response)
+                self.logged_in = False
                 logger.info(f"{self.session_name} | login failed... Response code: {response.status_code}")
+
         except Exception as e:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to get user data...: {e}</red>")
@@ -200,21 +201,23 @@ class Tapper:
                          f"{error}")
             await asyncio.sleep(delay=3)
 
-    async def check_proxy(self, http_client: aiohttp.ClientSession, proxy: Proxy) -> None:
+    async def check_proxy(self, http_client: aiohttp.ClientSession, proxy: Proxy):
         try:
             response = await http_client.get(url='https://httpbin.org/ip', timeout=aiohttp.ClientTimeout(5))
             ip = (await response.json()).get('origin')
             logger.info(f"{self.session_name} | Proxy IP: {ip}")
+            return True
         except Exception as error:
             logger.error(f"{self.session_name} | Proxy: {proxy} | Error: {error}")
+            return False
 
-    def acount_init(self, auth_token):
+    def acount_init(self, auth_token, session: requests.Session):
         try:
             data = {"lang": "en", "sex": "male"}
 
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
-            response = requests.post(api_init, headers=headers, json=data)
+            response = session.post(api_init, headers=headers, json=data)
             if response.status_code == 200:
                 logger.info(
                     f"{self.session_name} | <green>Successfully set up account</green>")
@@ -245,7 +248,7 @@ class Tapper:
                          f"{error}")
             await asyncio.sleep(delay=3)
 
-    def auto_tap(self, auth_token, tapcount: int):
+    def auto_tap(self, auth_token, tapcount: int, session: requests.Session):
         try:
             payload = {
                 "count": int(tapcount)
@@ -253,7 +256,7 @@ class Tapper:
 
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
-            response = requests.post(api_tap, headers=headers, json=payload)
+            response = session.post(api_tap, headers=headers, json=payload)
             if response.status_code == 200:
                 response_data = response.json()
                 self.available_taps = response_data['clicker']['availableTaps']
@@ -270,7 +273,7 @@ class Tapper:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to Tap ...: {e}</red>")
 
-    def boost_energy(self, auth_token):
+    def boost_energy(self, auth_token, session: requests.Session):
         try:
             payload = {
                 "boostId": "full-available-taps",
@@ -279,7 +282,7 @@ class Tapper:
 
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
-            response = requests.post(api_boost, headers=headers, json=payload)
+            response = session.post(api_boost, headers=headers, json=payload)
             if response.status_code == 200:
                 response_data = response.json()
                 self.available_taps = response_data['clicker']['maxTaps']
@@ -295,7 +298,7 @@ class Tapper:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to boost ...: {e}</red>")
 
-    def boost_turbo(self, auth_token):
+    def boost_turbo(self, auth_token, session: requests.Session):
         try:
             payload = {
                 "boostId": "turbo",
@@ -304,7 +307,7 @@ class Tapper:
 
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
-            response = requests.post(api_boost, headers=headers, json=payload)
+            response = session.post(api_boost, headers=headers, json=payload)
             if response.status_code == 200:
                 response_data = response.json()
                 self.boost_turbo_lvl = response_data['boost']['level']
@@ -320,11 +323,11 @@ class Tapper:
             logger.error(f"{self.session_name} | <red>Unknown error while trying to boost ...: {e}</red>")
             return False
 
-    def get_boost_info(self, auth_token):
+    def get_boost_info(self, auth_token, session: requests.Session):
         try:
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
-            response = requests.post(api_boost_info, headers=headers)
+            response = session.post(api_boost_info, headers=headers)
             if response.status_code == 200:
                 response_data = response.json()
                 for boost in response_data['boostsList']:
@@ -341,7 +344,7 @@ class Tapper:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to get boost info ...: {e}</red>")
 
-    def upgrade_boost(self, auth_token, boostId):
+    def upgrade_boost(self, auth_token, boostId, session: requests.Session):
         try:
             if boostId == "earn-per-tap":
                 txt = "Multi-tap"
@@ -356,7 +359,7 @@ class Tapper:
 
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
-            response = requests.post(api_boost, headers=headers, json=payload)
+            response = session.post(api_boost, headers=headers, json=payload)
             if response.status_code == 200:
                 response_data = response.json()
                 self.balance = response_data['clicker']['balance']
@@ -368,11 +371,11 @@ class Tapper:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to upgrade {txt} ...: {e}</red>")
 
-    def get_task_list(self, auth_token):
+    def get_task_list(self, auth_token, session: requests.Session):
         try:
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
-            response = requests.post(api_task_list, headers=headers)
+            response = session.post(api_task_list, headers=headers)
             if response.status_code == 200:
                 response_data = response.json()
                 self.task_list = response_data['tasks']
@@ -382,7 +385,7 @@ class Tapper:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to get task list ...: {e}</red>")
 
-    async def do_task(self, auth_token, taskId):
+    async def do_task(self, auth_token, taskId, session: requests.Session):
         try:
             payload = {
                 "taskId": taskId,
@@ -391,7 +394,7 @@ class Tapper:
 
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
-            response = requests.post(api_do_task, headers=headers, json=payload)
+            response = session.post(api_do_task, headers=headers, json=payload)
             if response.status_code == 200:
                 response_data = response.json()
                 self.balance = response_data['clicker']['balance']
@@ -409,7 +412,7 @@ class Tapper:
             logger.error(
                 f"{self.session_name} | <red>Unknown error while trying to do task: {taskId} - Error: {e}</red>")
 
-    def choose_sponsor(self, auth_token):
+    def choose_sponsor(self, auth_token, session: requests.Session):
         try:
             payload = {
                 "sponsor": "okx"
@@ -417,7 +420,7 @@ class Tapper:
 
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
-            response = requests.post(api_sponsor, headers=headers, json=payload)
+            response = session.post(api_sponsor, headers=headers, json=payload)
             if response.status_code == 200:
                 logger.success(f"{self.session_name} | Successfully chosen sponsor...")
             else:
@@ -449,12 +452,12 @@ class Tapper:
         else:
             logger.info(f"{self.session_name} | Get combo data failed.. Response code: {response.status_code}")
 
-    def get_daily_data(self, auth_token):
+    def get_daily_data(self, auth_token, session: requests.Session):
         try:
 
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
-            response = requests.post(api_daily, headers=headers)
+            response = session.post(api_daily, headers=headers)
             if response.status_code == 200:
                 response_data = response.json()
                 self.daily_data = response_data
@@ -466,7 +469,7 @@ class Tapper:
             logger.error(
                 f"{self.session_name} | <red>Unknown error while trying get daily info - Error: {e}</red>")
 
-    def play_enigma(self, auth_token, enigmaId, passphase):
+    def play_enigma(self, auth_token, enigmaId, passphase, session: requests.Session):
         try:
 
             payload = {
@@ -475,7 +478,7 @@ class Tapper:
             }
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
-            response = requests.post(api_play_enigma, headers=headers, json=payload)
+            response = session.post(api_play_enigma, headers=headers, json=payload)
             if response.status_code == 200:
                 response_data = response.json()
                 self.balance = response_data['clicker']['balance']
@@ -488,7 +491,7 @@ class Tapper:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to claim enigma - Error: {e}</red>")
 
-    def play_superset(self, auth_token, comboId, cards):
+    def play_superset(self, auth_token, comboId, cards, session: requests.Session):
         try:
             codei = ",".join(cards)
             payload = {
@@ -498,7 +501,7 @@ class Tapper:
 
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
-            response = requests.post(api_play_combo, headers=headers, json=payload)
+            response = session.post(api_play_combo, headers=headers, json=payload)
             if response.status_code == 200:
                 response_data = response.json()
                 self.balance = response_data['clicker']['balance']
@@ -510,7 +513,7 @@ class Tapper:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to claim superset - Error: {e}</red>")
 
-    def play_easter(self, auth_token, easter, easterEggsId):
+    def play_easter(self, auth_token, easter, easterEggsId, session: requests.Session):
         try:
             payload = {
                 "easter": easter,
@@ -519,7 +522,7 @@ class Tapper:
             print(payload)
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
-            response = requests.post(api_play_easter, headers=headers, json=payload)
+            response = session.post(api_play_easter, headers=headers, json=payload)
             if response.status_code == 200:
                 response_data = response.json()
                 self.balance = response_data['clicker']['balance']
@@ -535,11 +538,11 @@ class Tapper:
             logger.error(
                 f"{self.session_name} | <red>Unknown error while trying to claim easter egg - Error: {e}</red>")
 
-    def get_cards_info(self, auth_token):
+    def get_cards_info(self, auth_token, session: requests.Session):
         try:
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
-            response = requests.post(api_data, headers=headers)
+            response = session.post(api_data, headers=headers)
             if response.status_code == 200:
                 response_data = response.json()
                 # print(response_data)
@@ -550,11 +553,11 @@ class Tapper:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to get cards info - Error: {e}</red>")
 
-    def get_user_cards(self, auth_token):
+    def get_user_cards(self, auth_token, session: requests.Session):
         try:
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
-            response = requests.post(api_sync, headers=headers)
+            response = session.post(api_sync, headers=headers)
             if response.status_code == 200:
                 response_data = response.json()
                 for card in response_data:
@@ -626,7 +629,7 @@ class Tapper:
                         return True
         return True
 
-    def upgrade_card(self, auth_token, cardId, cost, type):
+    def upgrade_card(self, auth_token, cardId, cost, type, session: requests.Session):
         try:
             payload = {
                 "upgradeId": cardId,
@@ -634,7 +637,7 @@ class Tapper:
 
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
-            response = requests.post(api_upgrade_card, headers=headers, json=payload)
+            response = session.post(api_upgrade_card, headers=headers, json=payload)
             if response.status_code == 200:
                 response_data = response.json()
                 if self.balance > response_data['clicker']['balance']:
@@ -668,9 +671,17 @@ class Tapper:
 
         headers["User-Agent"] = generate_random_user_agent(device_type='android', browser_type='chrome')
         http_client = CloudflareScraper(headers=headers, connector=proxy_conn)
+        session = requests.Session()
 
         if proxy:
-            await self.check_proxy(http_client=http_client, proxy=proxy)
+            proxy_check = await self.check_proxy(http_client=http_client, proxy=proxy)
+            if proxy_check:
+                proxy_type = proxy.split(':')[0]
+                proxies = {
+                    proxy_type: proxy
+                }
+                session.proxies.update(proxies)
+                logger.info(f"{self.session_name} | bind with proxy ip: {proxy}")
 
         token_live_time = randint(3500, 3600)
         while True:
@@ -683,183 +694,183 @@ class Tapper:
                     access_token_created_time = time()
                     token_live_time = randint(3500, 3600)
 
-                self.get_user_data(self.auth_token)
+                self.get_user_data(self.auth_token, session)
+                if self.logged_in:
+                    if self.new_account:
+                        self.acount_init(self.auth_token, session)
 
-                if self.new_account:
-                    self.acount_init(self.auth_token)
+                    self.get_user_level(self.auth_token)
+                    self.get_ref(self.auth_token)
 
-                self.get_user_level(self.auth_token)
-                self.get_ref(self.auth_token)
+                    if settings.AUTO_TASK:
+                        self.get_task_list(self.auth_token, session)
 
-                if settings.AUTO_TASK:
-                    self.get_task_list(self.auth_token)
-
-                    for task in self.task_list:
-                        if task['id'] == "streak_days_reward" and task['lastUpgradeAt'] != 0:
-                            timestamp = task['lastUpgradeAt']
-                            timestamp_date = datetime.fromtimestamp(timestamp)
-                            today = datetime.now().date()
-                            yesterday = today - timedelta(days=1)
-                            if timestamp_date.date() == yesterday:
-                                await self.do_task(self.auth_token, task['id'])
+                        for task in self.task_list:
+                            if task['id'] == "streak_days_reward" and task['lastUpgradeAt'] != 0:
+                                timestamp = task['lastUpgradeAt']
+                                timestamp_date = datetime.fromtimestamp(timestamp)
+                                today = datetime.now().date()
+                                yesterday = today - timedelta(days=1)
+                                if timestamp_date.date() == yesterday:
+                                    await self.do_task(self.auth_token, task['id'], session)
+                                else:
+                                    continue
+                            elif task['id'] == "invite_friends" or task['id'] == "invite_friends_10x":
+                                continue
+                            elif task['id'] == "RRBOOST":
+                                continue
+                            elif task['id'] == "select_sponsor" and task['isCompleted'] is False:
+                                self.choose_sponsor(self.auth_token, session)
+                                await self.do_task(self.auth_token, task['id'], session)
+                                await asyncio.sleep(randint(2, 5))
+                            elif task['isCompleted'] is False:
+                                await self.do_task(self.auth_token, task['id'], session)
                             else:
                                 continue
-                        elif task['id'] == "invite_friends" or task['id'] == "invite_friends_10x":
-                            continue
-                        elif task['id'] == "RRBOOST":
-                            continue
-                        elif task['id'] == "select_sponsor" and task['isCompleted'] is False:
-                            self.choose_sponsor(self.auth_token)
-                            await self.do_task(self.auth_token, task['id'])
-                            await asyncio.sleep(randint(2, 5))
-                        elif task['isCompleted'] is False:
-                            await self.do_task(self.auth_token, task['id'])
+
+                    if settings.AUTO_ENIGMA:
+                        self.get_daily_data(self.auth_token, session)
+                        self.get_daily_combo()
+
+                        if int(self.daily_data['enigma']['countTry']) >= 3:
+                            logger.info(f"{self.session_name} | Out of chances to play today, skipping...")
+
+                        elif self.daily_data['enigma']['completedAt'] == 0 and int(
+                                self.daily_data['enigma']['countTry']) > 0 and self.get_from_cache:
+                            logger.info(f"{self.session_name} | Wait to find enigma...")
+                        elif self.daily_data['enigma']['completedAt'] == 0:
+                            logger.info(f"{self.session_name} | Attempt to play enigma...")
+                            self.play_enigma(self.auth_token, self.daily_data['enigma']['enigmaId'], self.enigma, session)
                         else:
-                            continue
+                            logger.info(f"{self.session_name} | Enigma already completed, skipping...")
+                        await asyncio.sleep(randint(3, 5))
 
-                if settings.AUTO_ENIGMA:
-                    self.get_daily_data(self.auth_token)
-                    self.get_daily_combo()
+                    if settings.AUTO_SUPERSET:
+                        self.get_daily_data(self.auth_token, session)
+                        self.get_daily_combo()
 
-                    if int(self.daily_data['enigma']['countTry']) >= 3:
-                        logger.info(f"{self.session_name} | Out of chances to play today, skipping...")
-
-                    elif self.daily_data['enigma']['completedAt'] == 0 and int(
-                            self.daily_data['enigma']['countTry']) > 0 and self.get_from_cache:
-                        logger.info(f"{self.session_name} | Wait to find enigma...")
-                    elif self.daily_data['enigma']['completedAt'] == 0:
-                        logger.info(f"{self.session_name} | Attempt to play enigma...")
-                        self.play_enigma(self.auth_token, self.daily_data['enigma']['enigmaId'], self.enigma)
-                    else:
-                        logger.info(f"{self.session_name} | Enigma already completed, skipping...")
-                    await asyncio.sleep(randint(3, 5))
-
-                if settings.AUTO_SUPERSET:
-                    self.get_daily_data(self.auth_token)
-                    self.get_daily_combo()
-
-                    if self.daily_data['superSet']['completedAt'] == 0:
-                        time_to_compare = datetime.strptime(self.superset_expire, "%Y-%m-%dT%H:%M:%S.%fZ")
-                        current_time = datetime.utcnow()
-                        logger.info(f"{self.session_name} | Attempt to play superset...")
-                        if current_time < time_to_compare:
-                            self.play_superset(self.auth_token, self.daily_data['superSet']['comboId'], self.superset)
-                        else:
-                            logger.info(f"{self.session_name} |Wait to find cards combo...")
-                    else:
-                        logger.info(f"{self.session_name} | Superset already completed, skipping...")
-                    await asyncio.sleep(randint(3, 5))
-
-                if settings.AUTO_EASTER:
-                    self.get_daily_data(self.auth_token)
-                    self.get_daily_combo()
-                    if self.daily_data['easterEggs']['completedAt'] == 0:
-                        time_to_compare = datetime.strptime(self.easter_expire, "%Y-%m-%dT%H:%M:%S.%fZ")
-                        current_time = datetime.utcnow()
-                        # print(current_time)
-                        logger.info(f"{self.session_name} | Attempt to play easter egg...")
-                        if current_time < time_to_compare:
-                            self.play_easter(self.auth_token, self.easter,
-                                             self.daily_data['easterEggs']['easterEggsId'])
-                        else:
-                            logger.info(f"{self.session_name} | Wait to find easter...")
-                    else:
-                        logger.info(f"{self.session_name} | Easter egg already completed, skipping...")
-                    await asyncio.sleep(randint(3, 5))
-
-                i = 10
-                if settings.AUTO_TAP:
-                    if settings.AUTO_BOOST:
-                        self.get_boost_info(self.auth_token)
-                    while i > 0:
-                        try:
-                            tapCount = randint(settings.TAP_COUNT[0], settings.TAP_COUNT[1])
-                            if self.available_taps > tapCount * self.multi:
-                                if settings.AUTO_BOOST:
-                                    # print(self.boost_turbo_lvl)
-                                    if self.boost_turbo_lvl <= 3 or self.last_update(self.cool_down_turbo) >= 43200:
-                                        if self.boost_turbo(self.auth_token):
-                                            logger.info(f"{self.session_name} | turbo boosted tap faster...")
-                                            tapCount = randint(settings.TAP_COUNT[0], settings.TAP_COUNT[1])
-                                            if self.available_taps > tapCount * self.multi:
-                                                self.auto_tap(self.auth_token, tapCount)
-                                                await asyncio.sleep(randint(3, 5))
-                                            tapCount = randint(settings.TAP_COUNT[0], settings.TAP_COUNT[1])
-                                            if self.available_taps > tapCount * self.multi:
-                                                self.auto_tap(self.auth_token, tapCount)
-                                                await asyncio.sleep(randint(3, 5))
-                                self.auto_tap(self.auth_token, tapCount)
-                                sleep_ = randint(settings.DELAY_BETWEEN_TAPS[0], settings.DELAY_BETWEEN_TAPS[1])
-                                await asyncio.sleep(sleep_)
+                        if self.daily_data['superSet']['completedAt'] == 0:
+                            time_to_compare = datetime.strptime(self.superset_expire, "%Y-%m-%dT%H:%M:%S.%fZ")
+                            current_time = datetime.utcnow()
+                            logger.info(f"{self.session_name} | Attempt to play superset...")
+                            if current_time < time_to_compare:
+                                self.play_superset(self.auth_token, self.daily_data['superSet']['comboId'], self.superset, session)
                             else:
-                                if settings.AUTO_BOOST:
-                                    if self.boost_energy_lvl <= 8:
-                                        current_time = time()
-                                        # print(current_time - self.cool_down)
-                                        if current_time - self.cool_down >= 2750 or self.last_update(
-                                                self.cool_down) >= 43200:
-                                            self.boost_energy(self.auth_token)
-                                        else:
-                                            logger.info(f"{self.session_name} | Cant use boost at this time...")
-                                            sleep_ = randint(settings.DELAY_BETWEEN_TAPS[0] + 120,
-                                                             settings.DELAY_BETWEEN_TAPS[1] + 120)
-                                            logger.info(
-                                                f"{self.session_name} | Out of energy... -  wait {sleep_} seconds")
-                                            await asyncio.sleep(sleep_)
-                                            self.available_taps += self.recover * sleep_
-                        except:
-                            logger.error(f"{self.session_name} | Check your TAP_COUNT setting...")
-                        i -= 1
-
-                if settings.AUTO_UPGRADE_CARDS:
-                    self.get_cards_info(self.auth_token)
-                    self.get_user_cards(self.auth_token)
-
-                    # print(self.mineCards)
-                    for card in self.cardsInfo:
-                        # print(self.mineCards[card])
-                        # print(card)
-                        if card['type'] == "level-up":
-                            profitable_cal = self.mineCards[card['upgradeId']]['price'] / \
-                                             self.mineCards[card['upgradeId']]['profitPerHour']
-                            self.caculate_profiable_card.update({
-                                profitable_cal: card
-                            })
-                        elif self.check_condition(card):
-                            self.upgrade_card(self.auth_token, card['upgradeId'],
-                                              self.mineCards[card['upgradeId']]['price'], card['tab'])
-
-                    if len(self.caculate_profiable_card) > 0:
-                        most_profitable_card = dict(sorted(self.caculate_profiable_card.items()))
-                        # print(most_profitable_card)
-                        for card in most_profitable_card:
-                            # print(f"{card} | {most_profitable_card[card]['upgradeId']}")
-                            if self.check_condition(most_profitable_card[card]):
-                                logger.info(f"{self.session_name} | Attemp to upgrade {most_profitable_card[card]['upgradeId']}")
-                                self.upgrade_card(self.auth_token, most_profitable_card[card]['upgradeId'], most_profitable_card[card]['price'], most_profitable_card[card]['tab'])
-                                await asyncio.sleep(randint(1,3))
-
-                        self.caculate_profiable_card.clear()
-
-
-                if settings.AUTO_UPGRADE_BOOST:
-                    if self.boosts is None:
-                        self.get_boost_info(self.auth_token)
-                    for boost in self.boosts:
-                        if boost['boostId'] in self.black_list:
-                            continue
-                        elif boost['price'] > self.balance:
-                            logger.info(f"{self.session_name} | Balance too low to buy {boost['boostId']}.")
-                            continue
-                        elif boost['boostId'] == "earn-per-tap" and boost['level'] >= settings.MULTI_TAP_LVL:
-                            continue
-                        elif boost['boostId'] == "max-taps" and boost['level'] >= settings.MAX_ENERGY_LVL:
-                            continue
-                        elif boost['boostId'] == "hourly-income-limit" and boost[
-                            'level'] >= settings.PASSIVE_INCOME_LVL:
-                            continue
+                                logger.info(f"{self.session_name} |Wait to find cards combo...")
                         else:
-                            self.upgrade_boost(self.auth_token, boost['boostId'])
+                            logger.info(f"{self.session_name} | Superset already completed, skipping...")
+                        await asyncio.sleep(randint(3, 5))
+
+                    if settings.AUTO_EASTER:
+                        self.get_daily_data(self.auth_token, session)
+                        self.get_daily_combo()
+                        if self.daily_data['easterEggs']['completedAt'] == 0:
+                            time_to_compare = datetime.strptime(self.easter_expire, "%Y-%m-%dT%H:%M:%S.%fZ")
+                            current_time = datetime.utcnow()
+                            # print(current_time)
+                            logger.info(f"{self.session_name} | Attempt to play easter egg...")
+                            if current_time < time_to_compare:
+                                self.play_easter(self.auth_token, self.easter,
+                                                 self.daily_data['easterEggs']['easterEggsId'], session)
+                            else:
+                                logger.info(f"{self.session_name} | Wait to find easter...")
+                        else:
+                            logger.info(f"{self.session_name} | Easter egg already completed, skipping...")
+                        await asyncio.sleep(randint(3, 5))
+
+                    i = 10
+                    if settings.AUTO_TAP:
+                        if settings.AUTO_BOOST:
+                            self.get_boost_info(self.auth_token, session)
+                        while i > 0:
+                            try:
+                                tapCount = randint(settings.TAP_COUNT[0], settings.TAP_COUNT[1])
+                                if self.available_taps > tapCount * self.multi:
+                                    if settings.AUTO_BOOST:
+                                        # print(self.boost_turbo_lvl)
+                                        if self.boost_turbo_lvl <= 3 or self.last_update(self.cool_down_turbo) >= 43200:
+                                            if self.boost_turbo(self.auth_token, session):
+                                                logger.info(f"{self.session_name} | turbo boosted tap faster...")
+                                                tapCount = randint(settings.TAP_COUNT[0], settings.TAP_COUNT[1])
+                                                if self.available_taps > tapCount * self.multi:
+                                                    self.auto_tap(self.auth_token, tapCount, session)
+                                                    await asyncio.sleep(randint(3, 5))
+                                                tapCount = randint(settings.TAP_COUNT[0], settings.TAP_COUNT[1])
+                                                if self.available_taps > tapCount * self.multi:
+                                                    self.auto_tap(self.auth_token, tapCount, session)
+                                                    await asyncio.sleep(randint(3, 5))
+                                    self.auto_tap(self.auth_token, tapCount, session)
+                                    sleep_ = randint(settings.DELAY_BETWEEN_TAPS[0], settings.DELAY_BETWEEN_TAPS[1])
+                                    await asyncio.sleep(sleep_)
+                                else:
+                                    if settings.AUTO_BOOST:
+                                        if self.boost_energy_lvl <= 8:
+                                            current_time = time()
+                                            # print(current_time - self.cool_down)
+                                            if current_time - self.cool_down >= 2750 or self.last_update(
+                                                    self.cool_down) >= 43200:
+                                                self.boost_energy(self.auth_token, session)
+                                            else:
+                                                logger.info(f"{self.session_name} | Cant use boost at this time...")
+                                                sleep_ = randint(settings.DELAY_BETWEEN_TAPS[0] + 120,
+                                                                 settings.DELAY_BETWEEN_TAPS[1] + 120)
+                                                logger.info(
+                                                    f"{self.session_name} | Out of energy... -  wait {sleep_} seconds")
+                                                await asyncio.sleep(sleep_)
+                                                self.available_taps += self.recover * sleep_
+                            except:
+                                logger.error(f"{self.session_name} | Check your TAP_COUNT setting...")
+                            i -= 1
+
+                    if settings.AUTO_UPGRADE_CARDS:
+                        self.get_cards_info(self.auth_token, session)
+                        self.get_user_cards(self.auth_token, session)
+
+                        # print(self.mineCards)
+                        for card in self.cardsInfo:
+                            # print(self.mineCards[card])
+                            # print(card)
+                            if card['type'] == "level-up":
+                                profitable_cal = self.mineCards[card['upgradeId']]['price'] / \
+                                                 self.mineCards[card['upgradeId']]['profitPerHour']
+                                self.caculate_profiable_card.update({
+                                    profitable_cal: card
+                                })
+                            elif self.check_condition(card):
+                                self.upgrade_card(self.auth_token, card['upgradeId'],
+                                                  self.mineCards[card['upgradeId']]['price'], card['tab'], session)
+
+                        if len(self.caculate_profiable_card) > 0:
+                            most_profitable_card = dict(sorted(self.caculate_profiable_card.items()))
+                            # print(most_profitable_card)
+                            for card in most_profitable_card:
+                                # print(f"{card} | {most_profitable_card[card]['upgradeId']}")
+                                if self.check_condition(most_profitable_card[card]):
+                                    logger.info(f"{self.session_name} | Attemp to upgrade {most_profitable_card[card]['upgradeId']}")
+                                    self.upgrade_card(self.auth_token, most_profitable_card[card]['upgradeId'], most_profitable_card[card]['price'], most_profitable_card[card]['tab'], session)
+                                    await asyncio.sleep(randint(1,3))
+
+                            self.caculate_profiable_card.clear()
+
+
+                    if settings.AUTO_UPGRADE_BOOST:
+                        if self.boosts is None:
+                            self.get_boost_info(self.auth_token, session)
+                        for boost in self.boosts:
+                            if boost['boostId'] in self.black_list:
+                                continue
+                            elif boost['price'] > self.balance:
+                                logger.info(f"{self.session_name} | Balance too low to buy {boost['boostId']}.")
+                                continue
+                            elif boost['boostId'] == "earn-per-tap" and boost['level'] >= settings.MULTI_TAP_LVL:
+                                continue
+                            elif boost['boostId'] == "max-taps" and boost['level'] >= settings.MAX_ENERGY_LVL:
+                                continue
+                            elif boost['boostId'] == "hourly-income-limit" and boost[
+                                'level'] >= settings.PASSIVE_INCOME_LVL:
+                                continue
+                            else:
+                                self.upgrade_boost(self.auth_token, boost['boostId'], session)
 
                 Sleep = randint(200, 300)
                 logger.info(f"Sleep {Sleep} seconds...")
