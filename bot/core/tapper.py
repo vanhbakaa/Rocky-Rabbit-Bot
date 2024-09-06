@@ -10,8 +10,8 @@ from aiohttp_proxy import ProxyConnector
 from better_proxy import Proxy
 from pyrogram import Client
 from pyrogram.errors import Unauthorized, UserDeactivated, AuthKeyUnregistered, FloodWait
-from pyrogram.raw import functions
-from pyrogram.raw.functions.messages import RequestWebView
+from pyrogram.raw.types import InputBotAppShortName
+from pyrogram.raw.functions.messages import RequestAppWebView
 from bot.core.agents import generate_random_user_agent
 from bot.config import settings
 import requests
@@ -154,15 +154,7 @@ class Tapper:
                             break
                     if not start_command_found:
                         self.new_account = True
-                        peer = await self.tg_client.resolve_peer('rocky_rabbit_bot')
-                        await self.tg_client.invoke(
-                            functions.messages.StartBot(
-                                bot=peer,
-                                peer=peer,
-                                start_param=start_param,
-                                random_id=randint(1, 9999999)
-                            )
-                        )
+                        await self.tg_client.send_message('rocky_rabbit_bot', "Started to play with bot!")
                 except (Unauthorized, UserDeactivated, AuthKeyUnregistered):
                     raise InvalidSession(self.session_name)
 
@@ -178,29 +170,21 @@ class Tapper:
 
                     await asyncio.sleep(fls + 3)
 
-            web_view = await self.tg_client.invoke(RequestWebView(
+            web_view = await self.tg_client.invoke(RequestAppWebView(
                 peer=peer,
-                bot=peer,
+                app=InputBotAppShortName(bot_id=peer, short_name="play"),
                 platform='android',
-                from_bot_menu=False,
-                url="https://play.rockyrabbit.io/",
+                write_allowed=True,
+                start_param=start_param
             ))
 
             auth_url = web_view.url
             # print(auth_url)
-            tg_web_data = unquote(
-                string=unquote(string=auth_url.split('tgWebAppData=')[1].split('&tgWebAppVersion')[0]))
-            query_id = tg_web_data.split('query_id=')[1].split('&user=')[0]
-            user = quote(tg_web_data.split("&user=")[1].split('&auth_date=')[0])
-            auth_date = tg_web_data.split('&auth_date=')[1].split('&hash=')[0]
-            hash_ = tg_web_data.split('&hash=')[1]
+            tg_web_data = unquote(string=auth_url.split('tgWebAppData=')[1].split('&tgWebAppVersion')[0])
 
-            self.user_id = tg_web_data.split('"id":')[1].split(',"first_name"')[0]
-            self.first_name = tg_web_data.split('"first_name":"')[1].split('","last_name"')[0]
-            self.last_name = tg_web_data.split('"last_name":"')[1].split('","username"')[0]
             if self.tg_client.is_connected:
                 await self.tg_client.disconnect()
-            return f"query_id={query_id}&user={user}&auth_date={auth_date}&hash={hash_}"
+            return tg_web_data
 
         except InvalidSession as error:
             raise error
@@ -579,11 +563,16 @@ class Tapper:
         if self.mineCards[card['upgradeId']]['isCompleted']:
             # logger.info(f"cant upgrade {card['upgradeId']} | reached max level")
             return False
-        elif self.balance < self.mineCards[card['upgradeId']]['price']:
+        elif self.balance < self.mineCards[card['upgradeId']]['price'] and card['tab'] != 'Claim':
             # logger.info(f"cant upgrade {card['upgradeId']} because of low balance")
             return False
         elif self.mineCards[card['upgradeId']]['type'] == "daily" and self.mineCards[card['upgradeId']]['lastUpgradeAt'] != 0:
-            return False
+            timestamp_datetime = datetime.fromtimestamp(self.mineCards[card['upgradeId']]['lastUpgradeAt'])
+            now = datetime.now()
+            start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            if start_of_today < timestamp_datetime:
+                # logger.info(f"cant upgrade {card['upgradeId']} already claimed today")
+                return False
         elif len(card['condition']) == 0:
             return True
         else:
@@ -623,7 +612,7 @@ class Tapper:
                         return False
                     else:
                         return True
-            return True
+        return True
 
     def upgrade_card(self, auth_token, cardId, cost):
         try:
@@ -839,6 +828,9 @@ class Tapper:
 
 async def run_tapper(tg_client: Client, proxy: str | None):
     try:
+        sleep_ = randint(1, 15)
+        logger.info(f"{tg_client.name} | start after {sleep_}")
+        await asyncio.sleep(sleep_)
         await Tapper(tg_client=tg_client).run(proxy=proxy)
     except InvalidSession:
         logger.error(f"{tg_client.name} | Invalid Session")
