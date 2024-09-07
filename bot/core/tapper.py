@@ -873,6 +873,7 @@ class Tapper:
                                 if self.check_condition(card):
                                     self.upgrade_card(self.auth_token, card['upgradeId'],
                                                   self.mineCards[card['upgradeId']]['price'], card['tab'], session)
+                                    await asyncio.sleep(randint(2, 5))
 
                     if settings.AUTO_UPGRADE_BOOST:
                         if self.boosts is None:
