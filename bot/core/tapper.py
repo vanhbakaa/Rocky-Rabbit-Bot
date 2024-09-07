@@ -791,7 +791,7 @@ class Tapper:
                         while i > 0:
                             try:
                                 tapCount = randint(settings.TAP_COUNT[0], settings.TAP_COUNT[1])
-                                if self.available_taps > tapCount * self.multi:
+                                if self.available_taps > tapCount * self.multi and self.available_taps > settings.SLEEP_BY_MIN_ENERGY:
                                     if settings.AUTO_BOOST:
                                         # print(self.boost_turbo_lvl)
                                         if self.boost_turbo_lvl <= 3:
