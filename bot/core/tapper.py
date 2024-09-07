@@ -808,7 +808,7 @@ class Tapper:
                                     if settings.AUTO_BOOST:
                                         if self.boost_energy_lvl <= 8:
                                             current_time = time()
-                                            # print(current_time - self.cool_down)
+                                            print(current_time - self.cool_down)
                                             if current_time - self.cool_down >= 2750 or self.last_update(
                                                     self.cool_down) >= 43200:
                                                 self.boost_energy(self.auth_token, session)
@@ -820,6 +820,13 @@ class Tapper:
                                                     f"{self.session_name} | Out of energy... -  wait {sleep_} seconds")
                                                 await asyncio.sleep(sleep_)
                                                 self.available_taps += self.recover * sleep_
+                                        else:
+                                            sleep_ = randint(settings.DELAY_BETWEEN_TAPS[0] + 120,
+                                                             settings.DELAY_BETWEEN_TAPS[1] + 120)
+                                            logger.info(
+                                                f"{self.session_name} | Out of energy... -  wait {sleep_} seconds")
+                                            await asyncio.sleep(sleep_)
+                                            self.available_taps += self.recover * sleep_
                                     else:
                                         sleep_ = randint(settings.DELAY_BETWEEN_TAPS[0] + 120,
                                                          settings.DELAY_BETWEEN_TAPS[1] + 120)
@@ -845,9 +852,6 @@ class Tapper:
                                 self.caculate_profiable_card.update({
                                     profitable_cal: card
                                 })
-                            elif self.check_condition(card):
-                                self.upgrade_card(self.auth_token, card['upgradeId'],
-                                                  self.mineCards[card['upgradeId']]['price'], card['tab'], session)
 
                         if len(self.caculate_profiable_card) > 0:
                             most_profitable_card = dict(sorted(self.caculate_profiable_card.items()))
@@ -861,6 +865,14 @@ class Tapper:
 
                             self.caculate_profiable_card.clear()
 
+                    if settings.AUTO_CLAIM_UPGRADE_CARDS:
+                        self.get_cards_info(self.auth_token, session)
+                        self.get_user_cards(self.auth_token, session)
+                        for card in self.cardsInfo:
+                            if card['type'] != "level-up":
+                                if self.check_condition(card):
+                                    self.upgrade_card(self.auth_token, card['upgradeId'],
+                                                  self.mineCards[card['upgradeId']]['price'], card['tab'], session)
 
                     if settings.AUTO_UPGRADE_BOOST:
                         if self.boosts is None:
