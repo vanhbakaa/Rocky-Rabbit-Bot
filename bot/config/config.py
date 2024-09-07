@@ -7,11 +7,13 @@ class Settings(BaseSettings):
     API_ID: int
     API_HASH: str
 
-    REF_LINK: str = "https://t.me/rocky_rabbit_bot/play?startapp=frId6624523270"
+    REF_LINK: str = "https://t.me/rocky_rabbit_bot/play?startapp=frId6624523270" # NOT WORKING RIGHT NOW !
 
     AUTO_TAP: bool = True
-    TAP_COUNT: list[int] = [50, 125]
+    TAP_COUNT: list[int] = [50, 75]
     DELAY_BETWEEN_TAPS: list[int] = [15, 20]
+    SLEEP_BY_MIN_ENERGY: int = 1000
+
 
     AUTO_BOOST: bool = True
     AUTO_UPGRADE_BOOST: bool = True
