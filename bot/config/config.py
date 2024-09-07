@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     API_ID: int
     API_HASH: str
 
-    REF_LINK: str = "https://t.me/rocky_rabbit_bot/play?startapp=frId6624523270" # NOT WORKING RIGHT NOW !
+    REF_LINK: str = "https://t.me/rocky_rabbit_bot/play?startapp=frId6624523270"
 
     AUTO_TAP: bool = True
     TAP_COUNT: list[int] = [50, 125]
