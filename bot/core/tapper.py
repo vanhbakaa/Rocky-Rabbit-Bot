@@ -597,6 +597,12 @@ class Tapper:
                     end_time = datetime.strptime(f"{condition['endHour']}:00:00", "%H:%M:%S").time()
                     curr_time = datetime.now().time()
                     if start_time <= curr_time <= end_time:
+                        #check if claimed or not
+                        if self.mineCards[card['upgradeId']]['lastUpgradeAt'] != 0:
+                            timestamp_datetime = datetime.fromtimestamp(self.mineCards[card['upgradeId']]['lastUpgradeAt'])
+                            now = datetime.now()
+                            if (now - timestamp_datetime) < timedelta(hours=2.5):
+                                return False
                         pass
                     else:
                         # logger.info(f"cant upgrade {card['upgradeId']} because time condition")
