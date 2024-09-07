@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     API_ID: int
     API_HASH: str
 
-    REF_LINK: str = "https://t.me/rocky_rabbit_bot/play?startapp=frId6624523270" 
+    REF_LINK: str = "https://t.me/rocky_rabbit_bot/play?startapp=frId6624523270" # NOT WORKING RIGHT NOW !
 
     AUTO_TAP: bool = True
     TAP_COUNT: list[int] = [50, 125]
@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     AUTO_EASTER: bool = True
 
     AUTO_UPGRADE_CARDS: bool = True
+    AUTO_CLAIM_UPGRADE_CARDS: bool = True
 
     USE_PROXY_FROM_FILE: bool = False
 
