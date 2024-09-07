@@ -794,7 +794,7 @@ class Tapper:
                                 if self.available_taps > tapCount * self.multi:
                                     if settings.AUTO_BOOST:
                                         # print(self.boost_turbo_lvl)
-                                        if self.boost_turbo_lvl <= 3 or self.last_update(self.cool_down_turbo) >= 43200:
+                                        if self.boost_turbo_lvl <= 3:
                                             if self.boost_turbo(self.auth_token, session):
                                                 logger.info(f"{self.session_name} | turbo boosted tap faster...")
                                                 tapCount = randint(settings.TAP_COUNT[0], settings.TAP_COUNT[1])
@@ -812,11 +812,10 @@ class Tapper:
                                     await asyncio.sleep(sleep_)
                                 else:
                                     if settings.AUTO_BOOST:
-                                        if self.boost_energy_lvl <= 8:
+                                        if self.boost_energy_lvl <= 8 or self.last_update(self.cool_down) >= 43200:
                                             current_time = time()
-                                            print(current_time - self.cool_down)
-                                            if current_time - self.cool_down >= 2750 or self.last_update(
-                                                    self.cool_down) >= 43200:
+                                            # print(self.last_update(self.cool_down))
+                                            if current_time - self.cool_down >= 2750:
                                                 self.boost_energy(self.auth_token, session)
                                             else:
                                                 logger.info(f"{self.session_name} | Cant use boost at this time...")
