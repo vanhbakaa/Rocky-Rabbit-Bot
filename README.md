@@ -2,7 +2,7 @@
 
 # Join the bot [here](https://t.me/rocky_rabbit_bot/play?startapp=frId6624523270)
 
-# 🔥🔥 Use PYTHON 3.10 - 3.11.5 🔥🔥
+# 🔥🔥 Use PYTHON 3.11.9 🔥🔥
 
 ## Features  
 | Feature                                                     | Supported  |
