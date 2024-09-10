@@ -14,7 +14,7 @@ from pyrogram.raw.types import InputBotAppShortName
 from pyrogram.raw.functions.messages import RequestAppWebView
 from bot.core.agents import generate_random_user_agent
 from bot.config import settings
-import requests
+import cloudscraper
 
 from bot.utils import logger
 from bot.exceptions import InvalidSession
@@ -84,11 +84,11 @@ class Tapper:
         f.write(data)
         f.close()
 
-    def get_user_level(self, auth_token):
+    def get_user_level(self, auth_token, session):
         try:
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
-            response = requests.post(api_level, headers=headers)
+            response = session.post(api_level, headers=headers)
             if response.status_code == 200:
                 response_data = response.json()
                 self.user_level = response_data['characters'][-1]['level']
@@ -98,11 +98,11 @@ class Tapper:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to get level info ...: {e}</red>")
 
-    def get_ref(self, auth_token):
+    def get_ref(self, auth_token, session):
         try:
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
-            response = requests.post(api_ref, headers=headers)
+            response = session.post(api_ref, headers=headers)
             if response.status_code == 200:
                 response_data = response.json()
                 self.ref = response_data['totalReferrals']
@@ -112,11 +112,11 @@ class Tapper:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to get referrals info ...: {e}</red>")
 
-    def get_user_data(self, auth_token, session: requests.Session):
+    def get_user_data(self, auth_token, scraper):
         try:
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
-            response = session.post(api_auth, headers=headers)
+            response = scraper.post(api_auth, headers=headers)
             if response.status_code == 200:
                 response_data = response.json()
                 self.balance = response_data['clicker']['balance']
@@ -125,6 +125,7 @@ class Tapper:
                     f"{self.session_name} | <green>Logged in</green> - Balance: <yellow>{response_data['clicker']['balance']}</yellow> - Profit per hour: <yellow>{response_data['clicker']['earnPassivePerHour']}</yellow> - Total earned: <yellow>{response_data['clicker']['totalBalance']}</yellow>")
 
             else:
+                print(response.text)
                 self.logged_in = False
                 logger.info(f"{self.session_name} | login failed... Response code: {response.status_code}")
 
@@ -211,7 +212,7 @@ class Tapper:
             logger.error(f"{self.session_name} | Proxy: {proxy} | Error: {error}")
             return False
 
-    def acount_init(self, auth_token, session: requests.Session):
+    def acount_init(self, auth_token, session):
         try:
             data = {"lang": "en", "sex": "male"}
 
@@ -248,7 +249,7 @@ class Tapper:
                          f"{error}")
             await asyncio.sleep(delay=3)
 
-    def auto_tap(self, auth_token, tapcount: int, session: requests.Session):
+    def auto_tap(self, auth_token, tapcount: int, session):
         try:
             payload = {
                 "count": int(tapcount)
@@ -273,7 +274,7 @@ class Tapper:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to Tap ...: {e}</red>")
 
-    def boost_energy(self, auth_token, session: requests.Session):
+    def boost_energy(self, auth_token, session):
         try:
             payload = {
                 "boostId": "full-available-taps",
@@ -298,7 +299,7 @@ class Tapper:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to boost ...: {e}</red>")
 
-    def boost_turbo(self, auth_token, session: requests.Session):
+    def boost_turbo(self, auth_token, session):
         try:
             payload = {
                 "boostId": "turbo",
@@ -323,7 +324,7 @@ class Tapper:
             logger.error(f"{self.session_name} | <red>Unknown error while trying to boost ...: {e}</red>")
             return False
 
-    def get_boost_info(self, auth_token, session: requests.Session):
+    def get_boost_info(self, auth_token, session):
         try:
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
@@ -344,7 +345,7 @@ class Tapper:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to get boost info ...: {e}</red>")
 
-    def upgrade_boost(self, auth_token, boostId, session: requests.Session):
+    def upgrade_boost(self, auth_token, boostId, session):
         try:
             if boostId == "earn-per-tap":
                 txt = "Multi-tap"
@@ -371,7 +372,7 @@ class Tapper:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to upgrade {txt} ...: {e}</red>")
 
-    def get_task_list(self, auth_token, session: requests.Session):
+    def get_task_list(self, auth_token, session):
         try:
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
@@ -385,7 +386,7 @@ class Tapper:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to get task list ...: {e}</red>")
 
-    async def do_task(self, auth_token, taskId, session: requests.Session):
+    async def do_task(self, auth_token, taskId, session):
         try:
             payload = {
                 "taskId": taskId,
@@ -412,7 +413,7 @@ class Tapper:
             logger.error(
                 f"{self.session_name} | <red>Unknown error while trying to do task: {taskId} - Error: {e}</red>")
 
-    def choose_sponsor(self, auth_token, session: requests.Session):
+    def choose_sponsor(self, auth_token, session):
         try:
             payload = {
                 "sponsor": "okx"
@@ -429,30 +430,20 @@ class Tapper:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to choose sponsor - Error: {e}</red>")
 
-    def get_daily_combo(self):
-        response = requests.get("https://freddywhest.github.io/rocky-rabbit-combos/data.json")
+    def get_daily_combo(self, session):
+        response = session.get("https://raw.githubusercontent.com/vanhbakaa/daily-combo-rocky-rabbit/main/data.json")
         if response.status_code == 200:
             response_data = response.json()
-            with open("enigma.txt", "r") as f:
-                enigma_from_cache = f.read()
-                # print(enigma_from_cache)
-
-            response_enigma = ",".join(response_data['enigma'])
-            if enigma_from_cache != response_enigma:
-                self.enigma = response_enigma
-                self.get_from_cache = False
-                self.write_to_file(response_enigma)
-            else:
-                self.get_from_cache = True
-                self.enigma = enigma_from_cache
+            self.enigma = response_data['enigma']
             self.easter = response_data['easter']
             self.superset = response_data['cards']
+            self.enigma_expire = response_data['expireAtForEnigma']
             self.easter_expire = response_data['expireAtForEaster']
             self.superset_expire = response_data['expireAtForCards']
         else:
             logger.info(f"{self.session_name} | Get combo data failed.. Response code: {response.status_code}")
 
-    def get_daily_data(self, auth_token, session: requests.Session):
+    def get_daily_data(self, auth_token, session):
         try:
 
             headers['Authorization'] = f'tma {auth_token}'
@@ -469,7 +460,7 @@ class Tapper:
             logger.error(
                 f"{self.session_name} | <red>Unknown error while trying get daily info - Error: {e}</red>")
 
-    def play_enigma(self, auth_token, enigmaId, passphase, session: requests.Session):
+    def play_enigma(self, auth_token, enigmaId, passphase, session):
         try:
 
             payload = {
@@ -491,12 +482,11 @@ class Tapper:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to claim enigma - Error: {e}</red>")
 
-    def play_superset(self, auth_token, comboId, cards, session: requests.Session):
+    def play_superset(self, auth_token, comboId, cards, session):
         try:
-            codei = ",".join(cards)
             payload = {
                 "comboId": comboId,
-                "combos": codei
+                "combos": cards
             }
 
             headers['Authorization'] = f'tma {auth_token}'
@@ -513,7 +503,7 @@ class Tapper:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to claim superset - Error: {e}</red>")
 
-    def play_easter(self, auth_token, easter, easterEggsId, session: requests.Session):
+    def play_easter(self, auth_token, easter, easterEggsId, session):
         try:
             payload = {
                 "easter": easter,
@@ -538,7 +528,7 @@ class Tapper:
             logger.error(
                 f"{self.session_name} | <red>Unknown error while trying to claim easter egg - Error: {e}</red>")
 
-    def get_cards_info(self, auth_token, session: requests.Session):
+    def get_cards_info(self, auth_token, session):
         try:
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
@@ -553,7 +543,7 @@ class Tapper:
             traceback.print_exc()
             logger.error(f"{self.session_name} | <red>Unknown error while trying to get cards info - Error: {e}</red>")
 
-    def get_user_cards(self, auth_token, session: requests.Session):
+    def get_user_cards(self, auth_token, session):
         try:
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
@@ -635,7 +625,7 @@ class Tapper:
                         return True
         return True
 
-    def upgrade_card(self, auth_token, cardId, cost, type, session: requests.Session):
+    def upgrade_card(self, auth_token, cardId, cost, type, session):
         try:
             payload = {
                 "upgradeId": cardId,
@@ -677,7 +667,7 @@ class Tapper:
 
         headers["User-Agent"] = generate_random_user_agent(device_type='android', browser_type='chrome')
         http_client = CloudflareScraper(headers=headers, connector=proxy_conn)
-        session = requests.Session()
+        session = cloudscraper.create_scraper()
 
         if proxy:
             proxy_check = await self.check_proxy(http_client=http_client, proxy=proxy)
@@ -705,8 +695,8 @@ class Tapper:
                     if self.new_account:
                         self.acount_init(self.auth_token, session)
 
-                    self.get_user_level(self.auth_token)
-                    self.get_ref(self.auth_token)
+                    self.get_user_level(self.auth_token, session)
+                    self.get_ref(self.auth_token, session)
 
                     if settings.AUTO_TASK:
                         self.get_task_list(self.auth_token, session)
@@ -736,30 +726,27 @@ class Tapper:
 
                     if settings.AUTO_ENIGMA:
                         self.get_daily_data(self.auth_token, session)
-                        self.get_daily_combo()
+                        self.get_daily_combo(session)
 
-                        if int(self.daily_data['enigma']['countTry']) >= 3:
-                            logger.info(f"{self.session_name} | Out of chances to play today, skipping...")
-
-                        elif self.daily_data['enigma']['completedAt'] == 0 and int(
-                                self.daily_data['enigma']['countTry']) > 0 and self.get_from_cache:
-                            logger.info(f"{self.session_name} | Wait to find enigma...")
-                        elif self.daily_data['enigma']['completedAt'] == 0:
-                            logger.info(f"{self.session_name} | Attempt to play enigma...")
-                            self.play_enigma(self.auth_token, self.daily_data['enigma']['enigmaId'], self.enigma, session)
+                        if self.daily_data['enigma']['completedAt'] == 0:
+                            current_time = int(time())
+                            if current_time < self.enigma_expire:
+                                logger.info(f"{self.session_name} | Attempt to play enigma...")
+                                self.play_enigma(self.auth_token, self.daily_data['enigma']['enigmaId'], self.enigma, session)
+                            else:
+                                logger.info(f"{self.session_name} |Wait to find enigma...")
                         else:
                             logger.info(f"{self.session_name} | Enigma already completed, skipping...")
                         await asyncio.sleep(randint(3, 5))
 
                     if settings.AUTO_SUPERSET:
                         self.get_daily_data(self.auth_token, session)
-                        self.get_daily_combo()
+                        self.get_daily_combo(session)
 
                         if self.daily_data['superSet']['completedAt'] == 0:
-                            time_to_compare = datetime.strptime(self.superset_expire, "%Y-%m-%dT%H:%M:%S.%fZ")
-                            current_time = datetime.utcnow()
-                            logger.info(f"{self.session_name} | Attempt to play superset...")
-                            if current_time < time_to_compare:
+                            current_time = int(time())
+                            if current_time < self.superset_expire:
+                                logger.info(f"{self.session_name} | Attempt to play superset...")
                                 self.play_superset(self.auth_token, self.daily_data['superSet']['comboId'], self.superset, session)
                             else:
                                 logger.info(f"{self.session_name} |Wait to find cards combo...")
@@ -769,13 +756,12 @@ class Tapper:
 
                     if settings.AUTO_EASTER:
                         self.get_daily_data(self.auth_token, session)
-                        self.get_daily_combo()
+                        self.get_daily_combo(session)
                         if self.daily_data['easterEggs']['completedAt'] == 0:
-                            time_to_compare = datetime.strptime(self.easter_expire, "%Y-%m-%dT%H:%M:%S.%fZ")
-                            current_time = datetime.utcnow()
+                            current_time = int(time())
                             # print(current_time)
-                            logger.info(f"{self.session_name} | Attempt to play easter egg...")
-                            if current_time < time_to_compare:
+                            if current_time < self.easter_expire:
+                                logger.info(f"{self.session_name} | Attempt to play easter egg...")
                                 self.play_easter(self.auth_token, self.easter,
                                                  self.daily_data['easterEggs']['easterEggsId'], session)
                             else:
