@@ -13,7 +13,7 @@ frozenlist==1.4.1
 idna==3.6
 Js2Py==0.74
 loguru==0.7.2
-requests==2.32.2
+requests==2.32.3
 multidict==6.0.5
 pyaes==1.6.1
 pydantic==2.6.4
@@ -35,3 +35,4 @@ win32-setctime==1.1.0
 yarl==1.9.4
 zope.interface==6.4.post2
 cloudscraper==1.2.71
+requests-toolbelt==1.0.0
