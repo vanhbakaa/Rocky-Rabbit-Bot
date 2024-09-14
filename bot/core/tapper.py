@@ -713,7 +713,7 @@ class Tapper:
                                     continue
                             elif task['id'] == "invite_friends" or task['id'] == "invite_friends_10x":
                                 continue
-                            elif task['id'] == "RRBOOST":
+                            elif task['id'] == "RRBOOST" or task['id'] == "rabbitprofile":
                                 continue
                             elif task['id'] == "select_sponsor" and task['isCompleted'] is False:
                                 self.choose_sponsor(self.auth_token, session)
