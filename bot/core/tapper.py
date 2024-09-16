@@ -169,7 +169,7 @@ class Tapper:
                             break
                     if not start_command_found:
                         self.new_account = True
-                        await self.tg_client.send_message('rocky_rabbit_bot', "Started to play with bot!")
+                        # await self.tg_client.send_message('rocky_rabbit_bot', "Started to play with bot!")
                 except (Unauthorized, UserDeactivated, AuthKeyUnregistered):
                     raise InvalidSession(self.session_name)
 
