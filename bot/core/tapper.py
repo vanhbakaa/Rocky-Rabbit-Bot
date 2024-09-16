@@ -3,7 +3,8 @@ import traceback
 from time import time
 from datetime import datetime, timedelta
 from urllib.parse import unquote
-
+import hashlib
+import os
 import aiohttp
 from aiocfscrape import CloudflareScraper
 from aiohttp_proxy import ProxyConnector
@@ -19,7 +20,7 @@ import cloudscraper
 from bot.utils import logger
 from bot.exceptions import InvalidSession
 from .headers import headers
-from random import randint
+from random import randint,uniform
 
 api_auth = "https://api.rockyrabbit.io/api/v1/account/start"
 api_tap = "https://api.rockyrabbit.io/api/v1/clicker/tap"
@@ -38,6 +39,9 @@ api_ref = 'https://api.rockyrabbit.io/api/v1/account/referrals'
 api_level = 'https://api.rockyrabbit.io/api/v1/account/level_current'
 api_upgrade_card = 'https://api.rockyrabbit.io/api/v1/mine/upgrade'
 api_init = "https://api.rockyrabbit.io/api/v1/account/init"
+api_register = "https://api.rockyrabbit.io/api/v1/account/game-pass/register"
+
+
 
 
 class Tapper:
@@ -74,15 +78,14 @@ class Tapper:
         self.recover = 1
         self.get_from_cache = False
         self.logged_in = False
+        self.need_game_pass = True
+        self.real_arena = False
+        self.uid = None
         self.limit_time_cards = ['breakfast_fighter', 'snackbreak_fighter', 'lunch_fighter', 'lunchbreak_fighter',
                                  'dinner_fighter', 'morning_fighter', 'afternoon_fighter', 'beforebed_fighter']
 
-        self.caculate_profiable_card = {}
 
-    def write_to_file(self, data):
-        f = open("enigma.txt", "w")
-        f.write(data)
-        f.close()
+        self.caculate_profiable_card = {}
 
     def get_user_level(self, auth_token, session):
         try:
@@ -120,7 +123,11 @@ class Tapper:
             if response.status_code == 200:
                 response_data = response.json()
                 self.balance = response_data['clicker']['balance']
+                self.need_game_pass = response_data['account']['needGamepass']
+                self.real_arena = response_data['account']['isRealBattleArena']
+                self.uid = response_data['account']['uid']
                 self.logged_in = True
+
                 logger.info(
                     f"{self.session_name} | <green>Logged in</green> - Balance: <yellow>{response_data['clicker']['balance']}</yellow> - Profit per hour: <yellow>{response_data['clicker']['earnPassivePerHour']}</yellow> - Total earned: <yellow>{response_data['clicker']['totalBalance']}</yellow>")
 
@@ -509,7 +516,7 @@ class Tapper:
                 "easter": easter,
                 "easterEggsId": easterEggsId
             }
-            print(payload)
+            # print(payload)
             headers['Authorization'] = f'tma {auth_token}'
             # print(headers)
             response = session.post(api_play_easter, headers=headers, json=payload)
@@ -661,6 +668,14 @@ class Tapper:
         current_time = time()
         return current_time - time_stampe
 
+    def get_ch(self):
+        random_data = os.urandom(32)
+        hash_object = hashlib.sha256(random_data)
+        random_hash = hash_object.hexdigest()
+        return random_hash
+
+
+
     async def run(self, proxy: str | None) -> None:
         access_token_created_time = 0
         proxy_conn = ProxyConnector().from_url(proxy) if proxy else None
@@ -686,9 +701,12 @@ class Tapper:
                     tg_web_data = await self.get_tg_web_data(proxy)
                     self.auth_token = tg_web_data
 
+
                     # print(tg_web_data)
                     access_token_created_time = time()
                     token_live_time = randint(3500, 3600)
+
+                headers['Rr-Ch'] = str(self.get_ch())
 
                 self.get_user_data(self.auth_token, session)
                 if self.logged_in:
@@ -713,7 +731,7 @@ class Tapper:
                                     continue
                             elif task['id'] == "invite_friends" or task['id'] == "invite_friends_10x":
                                 continue
-                            elif task['id'] == "RRBOOST" or task['id'] == "rabbitprofile":
+                            elif task['id'] == "RRBOOST":
                                 continue
                             elif task['id'] == "select_sponsor" and task['isCompleted'] is False:
                                 self.choose_sponsor(self.auth_token, session)
@@ -885,6 +903,7 @@ class Tapper:
                             else:
                                 self.upgrade_boost(self.auth_token, boost['boostId'], session)
 
+
                 Sleep = randint(200, 300)
                 logger.info(f"Sleep {Sleep} seconds...")
                 await asyncio.sleep(Sleep)
@@ -900,7 +919,7 @@ class Tapper:
 async def run_tapper(tg_client: Client, proxy: str | None):
     try:
         sleep_ = randint(1, 15)
-        logger.info(f"{tg_client.name} | start after {sleep_}")
+        logger.info(f"{tg_client.name} | start after {sleep_}s")
         await asyncio.sleep(sleep_)
         await Tapper(tg_client=tg_client).run(proxy=proxy)
     except InvalidSession:
