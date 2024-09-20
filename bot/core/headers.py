@@ -4,7 +4,7 @@ headers = {
     'Accept-Language': 'en,en-US;q=0.9,vi;q=0.8',
     'Authorization': '',
     "Rr-Ch": "",
-    "Rr-Version": "2.2.10",
+    "Rr-Version": "2.2.11",
     "Cache-Control": "no-cache",
     "Pragma": "no-cache",
     "Content-Type": "application/json",
